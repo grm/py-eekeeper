@@ -36,23 +36,23 @@ def _make_test_save_dir() -> Path:
     header = bytearray(GAME_HEADER_SIZE)
     header[0:4] = b"GAME"
     header[4:8] = b"V2.0"
-    struct.pack_into("<I", header, 0x14, 10000)  # gold
-    header[0x44] = 180  # reputation (18*10)
+    struct.pack_into("<I", header, 0x18, 10000)  # gold
+    header[0x54] = 180  # reputation (18*10)
 
     in_party_offset = GAME_HEADER_SIZE
-    struct.pack_into("<I", header, 0x18, in_party_offset)
-    struct.pack_into("<I", header, 0x1C, 1)
-    struct.pack_into("<I", header, 0x24, in_party_offset + CHARINFO_SIZE)
-    struct.pack_into("<I", header, 0x28, 0)
-    struct.pack_into("<I", header, 0x2C, in_party_offset + CHARINFO_SIZE)
-    struct.pack_into("<I", header, 0x30, 0)
+    cre_offset = in_party_offset + CHARINFO_SIZE
+    end_offset = cre_offset + len(cre_data)
+    struct.pack_into("<I", header, 0x20, in_party_offset)
+    struct.pack_into("<I", header, 0x24, 1)
+    struct.pack_into("<I", header, 0x30, end_offset)
+    struct.pack_into("<I", header, 0x34, 0)
+    struct.pack_into("<I", header, 0x38, end_offset)
     struct.pack_into("<I", header, 0x3C, 0)
-    struct.pack_into("<I", header, 0x40, in_party_offset + CHARINFO_SIZE)
-    struct.pack_into("<I", header, 0x58, in_party_offset + CHARINFO_SIZE + len(cre_data))
+    struct.pack_into("<I", header, 0x4C, 0)
+    struct.pack_into("<I", header, 0x50, end_offset)
 
     charinfo = bytearray(CHARINFO_SIZE)
     struct.pack_into("<H", charinfo, 0x02, 0)
-    cre_offset = in_party_offset + CHARINFO_SIZE
     struct.pack_into("<I", charinfo, 0x04, cre_offset)
     struct.pack_into("<I", charinfo, 0x08, len(cre_data))
     charinfo[0xC0:0xC0 + 6] = b"Minsc\x00"

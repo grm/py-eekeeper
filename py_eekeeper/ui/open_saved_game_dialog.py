@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from ..config import Config
+from ..formats.inf_game import find_baldur_gam
 
 
 class OpenSavedGameDialog(QDialog):
@@ -58,7 +59,7 @@ class OpenSavedGameDialog(QDialog):
         save_dir = base / "save"
         if save_dir.exists():
             for entry in sorted(save_dir.iterdir()):
-                if entry.is_dir() and (entry / "BALDUR.GAM").exists():
+                if entry.is_dir() and find_baldur_gam(entry):
                     item = QListWidgetItem(entry.name)
                     item.setData(Qt.ItemDataRole.UserRole, str(entry))
                     self._list_single.addItem(item)
@@ -67,7 +68,7 @@ class OpenSavedGameDialog(QDialog):
         mp_dir = base / "mpsave"
         if mp_dir.exists():
             for entry in sorted(mp_dir.iterdir()):
-                if entry.is_dir() and (entry / "BALDUR.GAM").exists():
+                if entry.is_dir() and find_baldur_gam(entry):
                     item = QListWidgetItem(entry.name)
                     item.setData(Qt.ItemDataRole.UserRole, str(entry))
                     self._list_multi.addItem(item)

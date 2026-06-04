@@ -35,35 +35,33 @@ def _make_minimal_gam() -> bytes:
     header[4:8] = b"V2.0"
 
     # Gold
-    struct.pack_into("<I", header, 0x14, 5000)
+    struct.pack_into("<I", header, 0x18, 5000)
 
     # 1 character in party
     in_party_offset = GAME_HEADER_SIZE
-    struct.pack_into("<I", header, 0x18, in_party_offset)
-    struct.pack_into("<I", header, 0x1C, 1)
+    cre_offset = in_party_offset + CHARINFO_SIZE
+    end_offset = cre_offset + len(cre_data)
+    struct.pack_into("<I", header, 0x20, in_party_offset)
+    struct.pack_into("<I", header, 0x24, 1)
 
     # 0 out of party
-    struct.pack_into("<I", header, 0x24, in_party_offset + CHARINFO_SIZE)
-    struct.pack_into("<I", header, 0x28, 0)
+    struct.pack_into("<I", header, 0x30, end_offset)
+    struct.pack_into("<I", header, 0x34, 0)
 
     # No globals
-    struct.pack_into("<I", header, 0x2C, in_party_offset + CHARINFO_SIZE)
-    struct.pack_into("<I", header, 0x30, 0)
+    struct.pack_into("<I", header, 0x38, end_offset)
+    struct.pack_into("<I", header, 0x3C, 0)
 
     # No journal
-    struct.pack_into("<I", header, 0x3C, 0)
-    struct.pack_into("<I", header, 0x40, in_party_offset + CHARINFO_SIZE)
+    struct.pack_into("<I", header, 0x4C, 0)
+    struct.pack_into("<I", header, 0x50, end_offset)
 
     # Reputation (14 * 10 = 140)
-    header[0x44] = 140
-
-    # After journal offset
-    struct.pack_into("<I", header, 0x58, in_party_offset + CHARINFO_SIZE + len(cre_data))
+    header[0x54] = 140
 
     # Build charinfo
     charinfo = bytearray(CHARINFO_SIZE)
     struct.pack_into("<H", charinfo, 0x02, 0)  # party position 0
-    cre_offset = in_party_offset + CHARINFO_SIZE
     struct.pack_into("<I", charinfo, 0x04, cre_offset)
     struct.pack_into("<I", charinfo, 0x08, len(cre_data))
     # Name
@@ -139,6 +137,7 @@ def test_modify_and_write():
     assert game2.read(out_path)
     assert game2.party_gold == 99999
     assert game2.get_party_cre(0).strength == 25
+    assert not game.has_changed()
 
     Path(path).unlink()
     Path(out_path).unlink()

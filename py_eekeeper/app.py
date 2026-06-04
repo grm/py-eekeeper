@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .config import Config
 from .formats.inf_tlk import InfTlk
-from .formats.inf_game import InfGame
+from .formats.inf_game import InfGame, find_baldur_gam
 from .formats.inf_chr import InfChr
 from .formats.inf_2da import Inf2DA
 from .formats.constants import RESTYPE_SPL, RESTYPE_ITM, RESTYPE_2DA, RESTYPE_IDS
@@ -47,6 +47,7 @@ class EEKeeperApp:
 
         self._initialized = False
         self._save_path: str = ""
+        self._gam_path: Path | None = None
 
     def initialize(self) -> bool:
         self.config.read()
@@ -91,7 +92,7 @@ class EEKeeperApp:
 
     def _load_kits(self):
         self.vl_kit.clear()
-        self.vl_kit.add(ValueItem(index=0, name="No Kit"))
+        self.vl_kit.add(ValueItem(index=self._encode_kit_ids_value(0x4000), name="No Kit"))
 
         data = self.resource_manager.get_resource(RESTYPE_2DA, "KITLIST")
         if not data:
@@ -101,28 +102,45 @@ class EEKeeperApp:
         if not table.parse(data):
             return
 
+        kit_ids_col = table.find_col("KITIDS")
         name_col = table.find_col("MIXED")
         if name_col < 0:
             name_col = table.find_col("ROWNAME")
 
         for row in range(table.rows):
-            row_name = table.get_row_name(row)
-            try:
-                kit_id = int(row_name) if row_name.isdigit() else row
-            except ValueError:
-                kit_id = row
+            if kit_ids_col < 0:
+                continue
+
+            kit_id = self._parse_int(table.get_value(row, kit_ids_col))
+            if kit_id is None:
+                continue
+            kit_value = self._encode_kit_ids_value(kit_id)
 
             if name_col >= 0:
                 name_strref = table.get_value(row, name_col)
                 try:
                     strref = int(name_strref)
-                    name = self.tlk.get_string(strref) or f"Kit {kit_id}"
+                    name = self.tlk.get_string(strref) or f"Kit {kit_id:#x}"
                 except ValueError:
                     name = name_strref
             else:
-                name = row_name
+                name = table.get_row_name(row)
 
-            self.vl_kit.add(ValueItem(index=kit_id, name=name))
+            if self.vl_kit.find_by_index(kit_value):
+                continue
+
+            self.vl_kit.add(ValueItem(index=kit_value, name=name))
+
+    def _parse_int(self, value: str) -> int | None:
+        try:
+            return int(value, 0)
+        except (TypeError, ValueError):
+            return None
+
+    def _encode_kit_ids_value(self, kit_id: int) -> int:
+        if kit_id < 0x10000:
+            return (kit_id << 16) & 0xFFFFFFFF
+        return kit_id & 0xFFFFFFFF
 
     def _load_spells(self):
         self.vl_spells.clear()
@@ -183,8 +201,8 @@ class EEKeeperApp:
 
     def open_save(self, save_dir: str | Path) -> bool:
         save_dir = Path(save_dir)
-        gam_path = save_dir / "BALDUR.GAM"
-        if not gam_path.exists():
+        gam_path = find_baldur_gam(save_dir)
+        if not gam_path:
             return False
 
         self.game = InfGame()
@@ -193,13 +211,13 @@ class EEKeeperApp:
             return False
 
         self._save_path = str(save_dir)
+        self._gam_path = gam_path
         return True
 
     def save_game(self) -> bool:
-        if not self.game or not self._save_path:
+        if not self.game or not self._gam_path:
             return False
-        gam_path = Path(self._save_path) / "BALDUR.GAM"
-        return self.game.write(gam_path)
+        return self.game.write(self._gam_path)
 
     def export_character(self, cre_index: int, path: str | Path) -> bool:
         if not self.game:

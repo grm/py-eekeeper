@@ -1,21 +1,28 @@
 """Widget displaying the party characters from a loaded save game."""
 
+from pathlib import Path
+
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QPushButton, QLabel, QScrollArea, QFrame,
+    QWidget, QHBoxLayout, QLabel, QScrollArea, QFrame, QToolButton,
 )
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import QSize, Signal, Qt
 
 from ..formats.inf_game import InfGame
 
 
-class CharacterButton(QPushButton):
+class CharacterButton(QToolButton):
     """A button representing a single party character."""
 
-    def __init__(self, name: str, index: int, parent=None):
+    def __init__(self, name: str, index: int, portrait_path: Path | None = None, parent=None):
         super().__init__(parent)
         self.index = index
         self.setText(name or f"Character {index + 1}")
-        self.setFixedSize(120, 80)
+        if portrait_path and portrait_path.is_file():
+            self.setIcon(QIcon(str(portrait_path)))
+        self.setIconSize(QSize(64, 64))
+        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.setFixedSize(130, 96)
         self.setCheckable(True)
 
 
@@ -33,7 +40,7 @@ class SavedGameWidget(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setFixedHeight(100)
+        self._scroll.setFixedHeight(116)
         self._scroll.setFrameShape(QFrame.Shape.StyledPanel)
 
         self._content = QWidget()
@@ -53,6 +60,7 @@ class SavedGameWidget(QWidget):
             btn.deleteLater()
         self._buttons.clear()
         self._current_index = -1
+        save_path = self._current_save_path()
 
         # Add party characters
         for i in range(game.party_count):
@@ -64,7 +72,7 @@ class SavedGameWidget(QWidget):
                 app = EEKeeperApp.instance()
                 name = app.tlk.get_string(strref) or f"Character {i + 1}"
 
-            btn = CharacterButton(name, i)
+            btn = CharacterButton(name, i, self._portrait_path(save_path, i))
             btn.clicked.connect(lambda checked, idx=i: self._on_button_clicked(idx))
             self._layout.addWidget(btn)
             self._buttons.append(btn)
@@ -83,6 +91,21 @@ class SavedGameWidget(QWidget):
         # Auto-select first character
         if self._buttons:
             self._on_button_clicked(0)
+
+    def _current_save_path(self) -> Path | None:
+        from ..app import EEKeeperApp
+
+        save_path = EEKeeperApp.instance().save_path
+        return Path(save_path) if save_path else None
+
+    def _portrait_path(self, save_path: Path | None, index: int) -> Path | None:
+        if not save_path:
+            return None
+        for suffix in ("bmp", "BMP"):
+            path = save_path / f"PORTRT{index}.{suffix}"
+            if path.is_file():
+                return path
+        return None
 
     def _on_button_clicked(self, index: int):
         self._current_index = index

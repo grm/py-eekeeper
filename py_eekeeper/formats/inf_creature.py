@@ -1131,6 +1131,9 @@ class InfCreature:
     def mark_changed(self):
         self._has_changed = True
 
+    def mark_saved(self):
+        self._has_changed = False
+
     @property
     def error(self) -> int:
         return self._error
