@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "py-eekeeper"
+version = "0.1.0"
+description = "Save game editor for Baldur's Gate Enhanced Edition"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.5",
+    "Pillow>=10.0",
+]
+
+[project.scripts]
+py-eekeeper = "py_eekeeper.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["py_eekeeper"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
