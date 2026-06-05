@@ -63,8 +63,8 @@ ITEMTYPE_MISC4 = 48
 ITEMTYPE_MISC5 = 49
 ITEMTYPE_SWORD = 57
 
-# Inventory slots
-INF_NUM_ITEMSLOTS = 39
+# Inventory slots. Matches eekeeper-qt's INF_CRE_ITEMSLOTS table.
+INF_NUM_ITEMSLOTS = 38
 
 # Creature state flags
 CRE_STAT_DEAD = 0x00000800
@@ -94,11 +94,16 @@ CRE_FLAG_BEEN_IN_PARTY = 0x00008000
 CRE_FLAG_RESTORE_ITEM = 0x00010000
 CRE_FLAG_HAS_DUALCLASS = 0x000001F8
 
-# Spell types
-INF_CRE_ST_INNATE = 0
+# Spell types. CRE files store memorized spells in this same order.
+INF_CRE_ST_PRIEST = 0
 INF_CRE_ST_WIZARD = 1
-INF_CRE_ST_PRIEST = 2
+INF_CRE_ST_INNATE = 2
 INF_CRE_SPELLTYPES = 3
+
+# Affect/effect types
+AFF_TYPE_SPELL = 0x7E
+AFF_TYPE_PROF = 0xE9
+AFF_TARG_CRE = 0x02
 
 # Max characters in party
 INF_MAX_CHARACTERS = 6

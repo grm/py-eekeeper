@@ -14,9 +14,11 @@ class ResourceManager:
         self._bif_cache: dict[int, InfBifFile] = {}
         self._override_files: dict[tuple[int, str], Path] = {}
         self._base_path: Path = Path()
+        self._ignore_data_versions: bool = False
 
-    def initialize(self, install_path: str | Path) -> bool:
+    def initialize(self, install_path: str | Path, ignore_data_versions: bool = False) -> bool:
         self._base_path = Path(install_path)
+        self._ignore_data_versions = ignore_data_versions
         key_path = self._base_path / "chitin.key"
         if not self._key.open(key_path):
             return False
@@ -30,13 +32,15 @@ class ResourceManager:
 
         from ..formats.constants import (
             RESTYPE_ITM, RESTYPE_SPL, RESTYPE_2DA, RESTYPE_BCS,
-            RESTYPE_CRE, RESTYPE_BAM, RESTYPE_IDS,
+            RESTYPE_CRE, RESTYPE_BAM, RESTYPE_IDS, RESTYPE_BMP, RESTYPE_BS,
         )
         ext_to_type = {
+            ".bmp": RESTYPE_BMP,
             ".itm": RESTYPE_ITM,
             ".spl": RESTYPE_SPL,
             ".2da": RESTYPE_2DA,
             ".bcs": RESTYPE_BCS,
+            ".bs": RESTYPE_BS,
             ".cre": RESTYPE_CRE,
             ".bam": RESTYPE_BAM,
             ".ids": RESTYPE_IDS,
@@ -94,7 +98,7 @@ class ResourceManager:
             else:
                 return None
 
-        bif = InfBifFile()
+        bif = InfBifFile(ignore_data_versions=self._ignore_data_versions)
         if not bif.open(bif_path):
             return None
 

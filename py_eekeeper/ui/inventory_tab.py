@@ -15,14 +15,15 @@ from ..app import EEKeeperApp
 SLOT_NAMES = [
     "Helmet", "Armor", "Shield", "Gloves", "L. Ring", "R. Ring",
     "Amulet", "Belt", "Boots", "Weapon 1", "Weapon 2", "Weapon 3",
-    "Weapon 4", "Quiver 1", "Quiver 2", "Quiver 3", "Quiver 4",
+    "Weapon 4", "Quiver 1", "Quiver 2", "Quiver 3", "Unused",
     "Cloak", "Quick Item 1", "Quick Item 2", "Quick Item 3",
     "Inventory 1", "Inventory 2", "Inventory 3", "Inventory 4",
     "Inventory 5", "Inventory 6", "Inventory 7", "Inventory 8",
     "Inventory 9", "Inventory 10", "Inventory 11", "Inventory 12",
     "Inventory 13", "Inventory 14", "Inventory 15", "Inventory 16",
-    "Magic Weapon", "Selected Weapon",
+    "Selected Weapon",
 ]
+assert len(SLOT_NAMES) == INF_NUM_ITEMSLOTS
 
 
 class InventoryTab(QWidget):

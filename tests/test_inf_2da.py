@@ -1,6 +1,7 @@
 """Tests for 2DA parser."""
 
 from py_eekeeper.formats.inf_2da import Inf2DA
+from py_eekeeper.formats.constants import XOR_KEY
 
 
 def test_parse_basic():
@@ -54,3 +55,16 @@ def test_empty_input():
     da = Inf2DA()
     assert da.parse("") is False
     assert da.parse("INVALID") is False
+
+
+def test_parse_xor_encrypted_bytes():
+    plain = b"2DA V1.0\n*\n       A    B\nR1   1    2\n"
+    encrypted = b"\xff\xff" + bytes(
+        byte ^ XOR_KEY[i % len(XOR_KEY)]
+        for i, byte in enumerate(plain)
+    )
+
+    da = Inf2DA()
+
+    assert da.parse(encrypted) is True
+    assert da.get_value(0, 1) == "2"

@@ -143,6 +143,33 @@ def test_modify_and_write():
     Path(out_path).unlink()
 
 
+def test_game_header_size_matches_eekeeper_qt():
+    assert GAME_HEADER_SIZE == 0xB4
+
+
+def test_party_char_name_updates_raw_charinfo():
+    data = _make_minimal_gam()
+
+    with tempfile.NamedTemporaryFile(suffix=".GAM", delete=False) as f:
+        f.write(data)
+        f.flush()
+        path = f.name
+
+    game = InfGame()
+    assert game.read(path)
+    game.set_party_char_name(0, "Ilya")
+
+    out_path = path + ".out"
+    assert game.write(out_path)
+    out_data = Path(out_path).read_bytes()
+    charinfo_offset = struct.unpack_from("<I", out_data, 0x20)[0]
+
+    assert out_data[charinfo_offset + 0xC0:charinfo_offset + 0xC5] == b"Ilya\x00"
+
+    Path(path).unlink()
+    Path(out_path).unlink()
+
+
 def test_invalid_file():
     game = InfGame()
     assert game.read("/nonexistent/path.GAM") is False
@@ -153,4 +180,22 @@ def test_invalid_file():
         path = f.name
 
     assert game.read(path) is False
+    Path(path).unlink()
+
+
+def test_game_version_rejection_and_ignore_flag():
+    data = bytearray(_make_minimal_gam())
+    data[4:8] = b"V9.9"
+
+    with tempfile.NamedTemporaryFile(suffix=".GAM", delete=False) as f:
+        f.write(data)
+        f.flush()
+        path = f.name
+
+    strict = InfGame()
+    ignored = InfGame(ignore_data_versions=True)
+
+    assert strict.read(path) is False
+    assert ignored.read(path) is True
+
     Path(path).unlink()

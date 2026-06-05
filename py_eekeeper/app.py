@@ -56,7 +56,10 @@ class EEKeeperApp:
             return False
 
         # Initialize resource manager
-        if not self.resource_manager.initialize(self.config.install_path):
+        if not self.resource_manager.initialize(
+            self.config.install_path,
+            ignore_data_versions=self.config.ignore_data_versions,
+        ):
             return False
 
         # Open TLK
@@ -205,7 +208,10 @@ class EEKeeperApp:
         if not gam_path:
             return False
 
-        self.game = InfGame()
+        self.game = InfGame(
+            ignore_data_versions=self.config.ignore_data_versions,
+            mem_spells_on_save=self.config.mem_spells_on_save,
+        )
         if not self.game.read(gam_path):
             self.game = None
             return False
@@ -226,13 +232,19 @@ class EEKeeperApp:
         if not cre:
             return False
 
-        chr_file = InfChr()
-        # Would need to construct a proper CHR from CRE data
-        # For now, write the CRE data wrapped in a CHR header
+        chr_file = InfChr(
+            ignore_data_versions=self.config.ignore_data_versions,
+            mem_spells_on_save=self.config.mem_spells_on_save,
+        )
+        chr_file.set_creature(cre)
+        chr_file.name = self.game.get_party_char_name(cre_index)
         return chr_file.write(path)
 
     def import_character(self, path: str | Path) -> InfChr | None:
-        chr_file = InfChr()
+        chr_file = InfChr(
+            ignore_data_versions=self.config.ignore_data_versions,
+            mem_spells_on_save=self.config.mem_spells_on_save,
+        )
         if chr_file.read(path):
             return chr_file
         return None

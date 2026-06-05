@@ -19,6 +19,7 @@ class BifEntry:
     file_length: int
     filename_offset: int
     filename_length: int
+    file_location: int
     filename: str = ""
 
 
@@ -56,14 +57,18 @@ class InfKey:
         self._bif_entries = []
         for i in range(bif_count):
             offset = bif_offset + i * 12
-            file_len, fname_offset, fname_len = struct.unpack_from(
-                "<IIH", data, offset
+            if offset + 12 > len(data):
+                return False
+            file_len, fname_offset, fname_len, file_location = struct.unpack_from(
+                "<IIHH", data, offset
             )
             # filename_length includes the drive letter prefix on Windows
             # but we just need the path part
             fname_end = fname_offset + fname_len
             filename_raw = data[fname_offset:fname_end]
             filename = filename_raw.decode("latin-1").rstrip("\x00")
+            if filename.startswith(":"):
+                filename = "/" + filename[1:]
             # Normalize path separators
             filename = filename.replace("\\", "/")
 
@@ -71,6 +76,7 @@ class InfKey:
                 file_length=file_len,
                 filename_offset=fname_offset,
                 filename_length=fname_len,
+                file_location=file_location,
                 filename=filename,
             )
             self._bif_entries.append(entry)
@@ -79,6 +85,8 @@ class InfKey:
         self._resources_by_type = {}
         for i in range(res_count):
             offset = res_offset + i * 14
+            if offset + 14 > len(data):
+                return False
             res_name_raw, res_type, locator = struct.unpack_from(
                 "<8sHI", data, offset
             )

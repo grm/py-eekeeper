@@ -45,9 +45,7 @@ class InfTlk:
                 entry_data = f.read(TLK_ENTRY_SIZE)
                 if len(entry_data) < TLK_ENTRY_SIZE:
                     break
-                flags, pitch_variance, volume_var, sound_res = struct.unpack_from(
-                    "<HHI8s", entry_data, 0
-                )
+                flags = struct.unpack_from("<H", entry_data, 0)[0]
                 offset, length = struct.unpack_from("<II", entry_data, 18)
                 self._entries.append((flags, offset, length))
 
@@ -71,7 +69,10 @@ class InfTlk:
             f.seek(self._strings_offset + offset)
             data = f.read(length)
 
-        text = data.decode("utf-8", errors="replace")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = data.decode("latin-1")
         self._cache[index] = text
         return text
 

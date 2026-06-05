@@ -8,7 +8,7 @@ from .constants import INF_MAX_CHARACTERS
 from .inf_creature import InfCreature
 
 
-GAME_HEADER_SIZE = 0xB0
+GAME_HEADER_SIZE = 0xB4
 CHARINFO_SIZE = 0x160
 GLOBAL_SIZE = 0x54
 
@@ -63,7 +63,7 @@ class GameGlobal:
 class InfGame:
     """Parses and writes BALDUR.GAM save game files."""
 
-    def __init__(self):
+    def __init__(self, ignore_data_versions: bool = False, mem_spells_on_save: bool = False):
         self._header_data: bytearray = bytearray(GAME_HEADER_SIZE)
         self._charinfo: list[GameCharInfo] = []
         self._party: list[InfCreature] = []
@@ -75,6 +75,8 @@ class InfGame:
         self._has_changed: bool = False
         self._error: int = 0
         self._filepath: str = ""
+        self._ignore_data_versions = ignore_data_versions
+        self._mem_spells_on_save = mem_spells_on_save
 
     def read(self, path: str | Path) -> bool:
         path = Path(path)
@@ -97,6 +99,9 @@ class InfGame:
             return False
 
         ver = data[4:8]
+        if not self._ignore_data_versions and ver not in (b"V2.0", b"V2.1"):
+            self._error = 1522
+            return False
 
         self._header_data = bytearray(data[:GAME_HEADER_SIZE])
 
@@ -122,7 +127,7 @@ class InfGame:
             self._charinfo.append(charinfo)
 
             # Parse embedded CRE
-            cre = InfCreature()
+            cre = InfCreature(self._ignore_data_versions, self._mem_spells_on_save)
             if charinfo.cre_offset > 0 and charinfo.cre_size > 0:
                 cre_data = data[charinfo.cre_offset:charinfo.cre_offset + charinfo.cre_size]
                 cre.read(cre_data, charinfo)
@@ -139,7 +144,7 @@ class InfGame:
             charinfo = self._parse_charinfo(ci_data)
             self._out_charinfo.append(charinfo)
 
-            cre = InfCreature()
+            cre = InfCreature(self._ignore_data_versions, self._mem_spells_on_save)
             if charinfo.cre_offset > 0 and charinfo.cre_size > 0:
                 cre_data = data[charinfo.cre_offset:charinfo.cre_offset + charinfo.cre_size]
                 cre.read(cre_data, charinfo)
@@ -327,7 +332,7 @@ class InfGame:
     def party_reputation(self, value: int):
         self._header_data[GAME_REPUTATION_OFFSET] = min(value * 10, 200)
         for cre in self._party:
-            cre.reputation = min(value * 10, 200)
+            cre.reputation = value
         self._has_changed = True
 
     def get_party_cre(self, index: int) -> InfCreature | None:
@@ -347,7 +352,11 @@ class InfGame:
 
     def set_party_char_name(self, index: int, name: str):
         if 0 <= index < len(self._charinfo):
-            self._charinfo[index].name = name
+            charinfo = self._charinfo[index]
+            charinfo.name = name
+            raw_data = bytearray(charinfo.raw_data) if len(charinfo.raw_data) >= CHARINFO_SIZE else bytearray(CHARINFO_SIZE)
+            raw_data[0xC0:0xD5] = name.encode("latin-1")[:0x15].ljust(0x15, b"\x00")
+            charinfo.raw_data = bytes(raw_data)
             self._has_changed = True
 
     def get_out_of_party_char_name(self, index: int) -> str:

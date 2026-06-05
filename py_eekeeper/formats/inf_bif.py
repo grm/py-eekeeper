@@ -1,9 +1,11 @@
 """Parser for Infinity Engine BIF (Bif Archive) files."""
 
 import struct
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from .constants import RESTYPE_BAM
 from .inf_key import ResInfo
 
 
@@ -18,11 +20,12 @@ class BifFileEntry:
 class InfBifFile:
     """Opens and reads data from BIF archive files."""
 
-    def __init__(self):
+    def __init__(self, ignore_data_versions: bool = False):
         self._file_path: Path | None = None
         self._entries: dict[tuple[int, int], BifFileEntry] = {}
         self._is_override: bool = False
         self._data: bytes = b""
+        self._ignore_data_versions = ignore_data_versions
 
     def open(self, path: str | Path, as_override: bool = False) -> bool:
         path = Path(path)
@@ -43,6 +46,8 @@ class InfBifFile:
             return False
 
         ver = self._data[4:8]
+        if not self._ignore_data_versions and ver != b"V1  ":
+            return False
         file_entry_count, tileset_count = struct.unpack_from("<II", self._data, 8)
 
         # File entries start after the header (at offset 16 for BIFF V1)
@@ -74,7 +79,22 @@ class InfBifFile:
             return None
         if entry.offset + entry.size > len(self._data):
             return None
-        return self._data[entry.offset : entry.offset + entry.size]
+        data = self._data[entry.offset : entry.offset + entry.size]
+        if res_info.type == RESTYPE_BAM and not data.startswith(b"BAM "):
+            return self._decompress_bam(data)
+        return data
+
+    def _decompress_bam(self, data: bytes) -> bytes | None:
+        if len(data) < 12:
+            return None
+        expected_size = struct.unpack_from(">I", data, 8)[0]
+        try:
+            decompressed = zlib.decompress(data[12:])
+        except zlib.error:
+            return None
+        if expected_size and len(decompressed) != expected_size:
+            return decompressed
+        return decompressed
 
     def get_entry(self, res_type: int, resource_index: int) -> BifFileEntry | None:
         return self._entries.get((res_type, resource_index))

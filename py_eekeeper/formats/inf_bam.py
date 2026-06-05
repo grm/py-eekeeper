@@ -24,29 +24,35 @@ class InfBam:
         self._transparent_index: int = 0
 
     def read(self, data: bytes) -> bool:
-        if len(data) < 18:
+        if len(data) < 24:
             return False
 
         sig = data[0:4]
         if sig != b"BAM ":
+            return False
+        if data[4:8] != b"V1  ":
             return False
 
         frame_count, cycle_count, transparent_index = struct.unpack_from(
             "<HBB", data, 8
         )
         frames_offset = struct.unpack_from("<I", data, 12)[0]
+        palette_offset = struct.unpack_from("<I", data, 16)[0]
+        lookup_table_offset = struct.unpack_from("<I", data, 20)[0]
+        if frames_offset + frame_count * 12 > len(data):
+            return False
+        if palette_offset + 256 * 4 > len(data):
+            return False
+        if lookup_table_offset > len(data):
+            return False
 
         self._transparent_index = transparent_index
         self._data = data
 
-        # Read palette (256 entries, 4 bytes each BGRA, after frame entries)
-        palette_offset = frames_offset + frame_count * 12
+        # Read palette (256 entries, 4 bytes each BGRA).
         self._palette = []
         for i in range(256):
             off = palette_offset + i * 4
-            if off + 4 > len(data):
-                self._palette.append((0, 0, 0, 255))
-                continue
             b, g, r, a = struct.unpack_from("<BBBB", data, off)
             self._palette.append((r, g, b, a))
 
@@ -56,15 +62,15 @@ class InfBam:
             off = frames_offset + i * 12
             if off + 12 > len(data):
                 break
-            w, h, cx, cy_and_offset = struct.unpack_from("<HHhI", data, off)
-            # cy is stored as signed short in the high bits, offset in low bits
-            # Actually: center_x is short, then 4 bytes for offset+flags
-            is_rle = not bool(cy_and_offset & 0x80000000)
-            data_offset = cy_and_offset & 0x7FFFFFFF
+            w, h, cx, cy, frame_data_offset = struct.unpack_from("<HHhhI", data, off)
+            is_rle = not bool(frame_data_offset & 0x80000000)
+            data_offset = frame_data_offset & 0x7FFFFFFF
+            if data_offset > len(data):
+                return False
 
             self._frames.append(BamFrame(
                 width=w, height=h,
-                center_x=cx, center_y=0,
+                center_x=cx, center_y=cy,
                 data_offset=data_offset,
                 is_rle=is_rle,
             ))
@@ -100,12 +106,9 @@ class InfBam:
                 if byte == self._transparent_index:
                     # Check if next byte is a count
                     if offset < len(self._data):
-                        count = self._data[offset]
+                        count = self._data[offset] + 1
                         offset += 1
-                        if count == 0:
-                            pixels.append((0, 0, 0, 0))
-                        else:
-                            pixels.extend([(0, 0, 0, 0)] * count)
+                        pixels.extend([(0, 0, 0, 0)] * count)
                     else:
                         pixels.append((0, 0, 0, 0))
                 else:

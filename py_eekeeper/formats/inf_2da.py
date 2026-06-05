@@ -1,5 +1,7 @@
 """Parser for Infinity Engine 2DA (2-dimensional array) files."""
 
+from .constants import XOR_KEY
+
 
 class Inf2DA:
     """Parses 2DA text tables used by Infinity Engine games.
@@ -22,6 +24,11 @@ class Inf2DA:
 
     def parse(self, text: str | bytes) -> bool:
         if isinstance(text, (bytes, bytearray)):
+            if len(text) >= 2 and text[0] == 0xFF and text[1] == 0xFF:
+                text = bytes(
+                    byte ^ XOR_KEY[i % len(XOR_KEY)]
+                    for i, byte in enumerate(text[2:])
+                )
             text = text.decode("latin-1")
 
         lines = [l for l in text.replace("\r\n", "\n").split("\n") if l.strip()]
