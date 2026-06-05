@@ -40,7 +40,7 @@ class InfChr:
 
         sig = data[0:4]
         if sig != b"CHR ":
-            self._error = 2002
+            self._error = 2003
             return False
 
         version = data[4:8]
@@ -96,7 +96,8 @@ class InfChr:
 
     @name.setter
     def name(self, value: str):
-        encoded = value.encode("latin-1")[:CHR_NAME_MAXLEN].ljust(CHR_NAME_MAXLEN, b"\x00")
+        # Match C++ qstrncpy(szName, pszName, CHR_NAME_MAXLEN-1): max 31 chars + null terminator
+        encoded = value.encode("latin-1")[:CHR_NAME_MAXLEN - 1].ljust(CHR_NAME_MAXLEN, b"\x00")
         self._header_data[8:8 + CHR_NAME_MAXLEN] = encoded
 
     def get_creature(self) -> InfCreature:

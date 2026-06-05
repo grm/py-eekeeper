@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from .app import EEKeeperApp
 from .ui.main_window import MainWindow
 from .ui.installation_dialog import InstallationDialog
+from .ui.theme import apply_theme
 
 
 def main():
@@ -18,6 +19,9 @@ def main():
     # Initialize the application core
     eekeeper = EEKeeperApp.instance()
     eekeeper.config.read()
+
+    # Apply theme from saved settings
+    apply_theme(app, eekeeper.config.theme)
 
     # If no install path configured, ask the user
     if not eekeeper.config.install_path:

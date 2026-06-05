@@ -22,6 +22,15 @@ class Config:
         self.default_open_singleplayer: bool = True
         self.use_grid_lines: bool = True
         self.ignore_data_versions: bool = False
+        self.theme: str = "system"
+
+    @property
+    def auto_backup(self) -> bool:
+        return self._settings.value("bAutoBackup", True, type=bool)
+
+    @auto_backup.setter
+    def auto_backup(self, value: bool):
+        self._settings.setValue("bAutoBackup", value)
 
     def read(self):
         self.install_path = self._settings.value("strInstallPath", "", str)
@@ -36,6 +45,7 @@ class Config:
         self.default_open_singleplayer = self._settings.value("bDefaultOpenSinglePlayer", True, bool)
         self.use_grid_lines = self._settings.value("bUseGridLines", True, bool)
         self.ignore_data_versions = self._settings.value("bIgnoreDataVersions", False, bool)
+        self.theme = self._settings.value("strTheme", "system", str)
 
     def write(self):
         self._settings.setValue("strInstallPath", self.install_path)
@@ -50,6 +60,7 @@ class Config:
         self._settings.setValue("bDefaultOpenSinglePlayer", self.default_open_singleplayer)
         self._settings.setValue("bUseGridLines", self.use_grid_lines)
         self._settings.setValue("bIgnoreDataVersions", self.ignore_data_versions)
+        self._settings.setValue("strTheme", self.theme)
         self._settings.sync()
 
     def _default_documents_path(self) -> str:

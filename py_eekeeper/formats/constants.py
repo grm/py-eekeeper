@@ -103,6 +103,7 @@ INF_CRE_SPELLTYPES = 3
 # Affect/effect types
 AFF_TYPE_SPELL = 0x7E
 AFF_TYPE_PROF = 0xE9
+AFF_TYPE_SET_LOCAL_VAR = 309
 AFF_TARG_CRE = 0x02
 
 # Max characters in party

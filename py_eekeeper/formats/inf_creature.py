@@ -50,6 +50,7 @@ class CreItem:
     quantity2: int = 0
     quantity3: int = 0
     identified: bool = False
+    raw_data: bytes = b""
 
 
 @dataclass
@@ -182,6 +183,7 @@ class InfCreature:
                 quantity2=qty2,
                 quantity3=qty3,
                 identified=bool(identified),
+                raw_data=data[off:off + 20],
             ))
 
         self._items = [CreItem() for _ in range(INF_NUM_ITEMSLOTS)]
@@ -278,14 +280,20 @@ class InfCreature:
                 result.extend(struct.pack("<H", 0xFFFF))
         result.extend(self._item_slots_unknown[:4].ljust(4, b"\x00"))
 
-        # Write items (only non-empty)
+        # Write items (only non-empty), preserving unknown bytes from the
+        # original binary data when available (expiry timer at offset 8-9 and
+        # flag bits at offset 17-19).
         for item in compact_items:
+            if len(item.raw_data) >= 20:
+                item_bytes = bytearray(item.raw_data[:20])
+            else:
+                item_bytes = bytearray(20)
+            # Overlay fields that may have been edited:
             name_bytes = item.res_name.encode("latin-1")[:8].ljust(8, b"\x00")
-            result.extend(name_bytes)
-            result.extend(b"\x00\x00")  # unknown
-            result.extend(struct.pack("<HHH", item.quantity1, item.quantity2, item.quantity3))
-            result.extend(struct.pack("<b", 1 if item.identified else 0))
-            result.extend(b"\x00\x00\x00")  # unknown
+            item_bytes[0:8] = name_bytes
+            struct.pack_into("<HHH", item_bytes, 10, item.quantity1, item.quantity2, item.quantity3)
+            item_bytes[16] = 1 if item.identified else 0
+            result.extend(item_bytes)
 
         # Write affects
         for aff in self._affects:
@@ -1139,6 +1147,9 @@ class InfCreature:
 
     def set_memorization_info(self, info: list[MemInfo]):
         self._mem_info = info[:]
+        # Keep wNumMemorizable1 and wNumMemorizable2 in sync (C++ behavior)
+        for mi in self._mem_info:
+            mi.num_memorized = mi.num_memorizable
         self._has_changed = True
 
     def get_memorized_spells(self) -> list[MemSpell]:
@@ -1270,6 +1281,22 @@ class InfCreature:
         ]
         self._affects = special_affects + affects[:]
         self._has_changed = True
+
+    def add_affect(self, affect: InfAffect, index: int = -1):
+        """Add an affect to the creature's affect list."""
+        if index < 0 or index >= len(self._affects):
+            self._affects.append(affect)
+        else:
+            self._affects.insert(index, affect)
+        self._has_changed = True
+
+    def remove_affect(self, affect: InfAffect):
+        """Remove a specific affect instance from the creature."""
+        try:
+            self._affects.remove(affect)
+            self._has_changed = True
+        except ValueError:
+            pass
 
     # --- Dual/Multi class ---
 

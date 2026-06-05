@@ -68,8 +68,7 @@ The main known gaps are UI and workflow coverage:
 - no complete party/global editor for gold and reputation;
 - `SpellBitmaps` exists but icons are not broadly wired into the UI;
 - `ValueListDialog` and `SaveGameNameDialog` exist but are not fully wired;
-- Windows support is not documented for the Python rewrite;
-- Black Pits save handling is not clearly exposed.
+- Windows support is not documented for the Python rewrite.
 
 ## Engineering Guidelines
 

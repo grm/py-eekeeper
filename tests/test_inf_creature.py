@@ -220,7 +220,7 @@ def test_meminfo_binary_order_matches_cre_format():
             type=INF_CRE_ST_PRIEST,
             level=2,
             num_memorizable=3,
-            num_memorized=4,
+            num_memorized=99,  # should be synced to num_memorizable by set_memorization_info
         )
     ])
 
@@ -228,7 +228,8 @@ def test_meminfo_binary_order_matches_cre_format():
     mem_info_offset = struct.unpack_from("<I", written, 0x2A8)[0]
     level, num1, num2, spell_type = struct.unpack_from("<HHHH", written, mem_info_offset)
 
-    assert (level, num1, num2, spell_type) == (2, 3, 4, INF_CRE_ST_PRIEST)
+    # C++ keeps wNumMemorizable1 and wNumMemorizable2 in sync
+    assert (level, num1, num2, spell_type) == (2, 3, 3, INF_CRE_ST_PRIEST)
 
 
 def test_empty_cre_offsets_match_eekeeper_qt():

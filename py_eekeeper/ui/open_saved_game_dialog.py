@@ -28,7 +28,7 @@ class OpenSavedGameDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        # Tabs for single/multiplayer
+        # Tabs for single/multiplayer/black pits
         self._tabs = QTabWidget()
 
         self._list_single = QListWidget()
@@ -38,6 +38,10 @@ class OpenSavedGameDialog(QDialog):
         self._list_multi = QListWidget()
         self._list_multi.itemDoubleClicked.connect(self._on_double_click)
         self._tabs.addTab(self._list_multi, "Multiplayer")
+
+        self._list_bp = QListWidget()
+        self._list_bp.itemDoubleClicked.connect(self._on_double_click)
+        self._tabs.addTab(self._list_bp, "Black Pits")
 
         layout.addWidget(self._tabs)
 
@@ -73,6 +77,15 @@ class OpenSavedGameDialog(QDialog):
                     item.setData(Qt.ItemDataRole.UserRole, str(entry))
                     self._list_multi.addItem(item)
 
+        # Black Pits saves
+        bp_dir = base / "bpsave"
+        if bp_dir.exists():
+            for entry in sorted(bp_dir.iterdir()):
+                if entry.is_dir() and find_baldur_gam(entry):
+                    item = QListWidgetItem(entry.name)
+                    item.setData(Qt.ItemDataRole.UserRole, str(entry))
+                    self._list_bp.addItem(item)
+
         # Select default tab
         if self._config.default_open_singleplayer:
             self._tabs.setCurrentIndex(0)
@@ -84,7 +97,13 @@ class OpenSavedGameDialog(QDialog):
         self.accept()
 
     def _on_accept(self):
-        current_list = self._list_single if self._tabs.currentIndex() == 0 else self._list_multi
+        tab_index = self._tabs.currentIndex()
+        if tab_index == 0:
+            current_list = self._list_single
+        elif tab_index == 1:
+            current_list = self._list_multi
+        else:
+            current_list = self._list_bp
         item = current_list.currentItem()
         if item:
             self._selected_path = item.data(Qt.ItemDataRole.UserRole)

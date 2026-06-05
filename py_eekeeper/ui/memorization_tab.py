@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 
 from ..formats.inf_creature import InfCreature, MemInfo
 from ..formats.constants import INF_CRE_ST_WIZARD, INF_CRE_ST_PRIEST, INF_CRE_ST_INNATE
+from ..app import EEKeeperApp
 
 
 SPELL_TYPE_NAMES = {
@@ -99,6 +100,16 @@ class MemorizationTab(QWidget):
             mem_info[row].num_memorizable = max(0, value)
             self._creature.set_memorization_info(mem_info)
 
+    def _is_mem_limit_reached(self, current_value: int) -> bool:
+        """Check if the memorization limit prevents incrementing.
+
+        Returns True if the limit is reached and the increment should be blocked.
+        """
+        app = EEKeeperApp.instance()
+        if not app.config.use_mem_spell_limit:
+            return False
+        return current_value >= app.config.mem_spell_limit
+
     def _modify_count(self, delta: int):
         row = self._table.currentRow()
         if row < 0 or not self._creature:
@@ -106,6 +117,8 @@ class MemorizationTab(QWidget):
 
         mem_info = self._creature.get_memorization_info()
         if 0 <= row < len(mem_info):
+            if delta > 0 and self._is_mem_limit_reached(mem_info[row].num_memorizable):
+                return
             mem_info[row].num_memorizable = max(0, mem_info[row].num_memorizable + delta)
             self._creature.set_memorization_info(mem_info)
             self._table.blockSignals(True)
@@ -117,6 +130,8 @@ class MemorizationTab(QWidget):
             return
         mem_info = self._creature.get_memorization_info()
         for mi in mem_info:
+            if delta > 0 and self._is_mem_limit_reached(mi.num_memorizable):
+                continue
             mi.num_memorizable = max(0, mi.num_memorizable + delta)
         self._creature.set_memorization_info(mem_info)
         self._table.blockSignals(True)

@@ -2,21 +2,24 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
-    QLabel, QSpinBox, QLineEdit, QComboBox, QScrollArea,
+    QLabel, QSpinBox, QLineEdit, QComboBox, QScrollArea, QPushButton,
 )
+from PySide6.QtGui import QUndoStack
 from PySide6.QtCore import Qt
 
 from ..formats.inf_creature import InfCreature
 from ..app import EEKeeperApp
+from .undo_commands import SetAttributeCommand
 
 
 class CharacterSheetWidget(QWidget):
     """Main character editing tab — stats, info, resistances, thief skills."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, undo_stack: QUndoStack | None = None):
         super().__init__(parent)
         self._creature: InfCreature | None = None
         self._loading = False
+        self._undo_stack = undo_stack
         self._setup_ui()
 
     def _setup_ui(self):
@@ -270,9 +273,23 @@ class CharacterSheetWidget(QWidget):
 
         row = len(colors)
         layout.addWidget(QLabel("Small Portrait:"), row, 0)
-        layout.addWidget(self._edit_small_portrait, row, 1)
+        small_row = QHBoxLayout()
+        small_row.addWidget(self._edit_small_portrait)
+        btn_browse_small = QPushButton("...")
+        btn_browse_small.setFixedWidth(30)
+        btn_browse_small.clicked.connect(lambda: self._browse_portrait("S", self._edit_small_portrait))
+        small_row.addWidget(btn_browse_small)
+        layout.addLayout(small_row, row, 1)
+
         layout.addWidget(QLabel("Large Portrait:"), row + 1, 0)
-        layout.addWidget(self._edit_large_portrait, row + 1, 1)
+        large_row = QHBoxLayout()
+        large_row.addWidget(self._edit_large_portrait)
+        btn_browse_large = QPushButton("...")
+        btn_browse_large.setFixedWidth(30)
+        btn_browse_large.clicked.connect(lambda: self._browse_portrait("L", self._edit_large_portrait))
+        large_row.addWidget(btn_browse_large)
+        layout.addLayout(large_row, row + 1, 1)
+
         self._edit_small_portrait.textChanged.connect(self._on_colors_changed)
         self._edit_large_portrait.textChanged.connect(self._on_colors_changed)
 
@@ -399,93 +416,118 @@ class CharacterSheetWidget(QWidget):
                 return
         combo.setCurrentIndex(0)
 
+    # --- Undo helper ---
+
+    def _push_change(self, attr_name: str, new_value):
+        """Push a SetAttributeCommand or directly apply the change."""
+        if not self._creature:
+            return
+        old_value = getattr(self._creature, attr_name)
+        if old_value == new_value:
+            return
+        if self._undo_stack:
+            cmd = SetAttributeCommand(
+                self._creature, attr_name, old_value, new_value
+            )
+            self._undo_stack.push(cmd)
+        else:
+            setattr(self._creature, attr_name, new_value)
+
     # --- Handlers ---
 
     def _on_attribute_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.strength = self._spin_str.value()
-        self._creature.strength_bonus = self._spin_str_bonus.value()
-        self._creature.dexterity = self._spin_dex.value()
-        self._creature.constitution = self._spin_con.value()
-        self._creature.intelligence = self._spin_int.value()
-        self._creature.wisdom = self._spin_wis.value()
-        self._creature.charisma = self._spin_cha.value()
+        self._push_change("strength", self._spin_str.value())
+        self._push_change("strength_bonus", self._spin_str_bonus.value())
+        self._push_change("dexterity", self._spin_dex.value())
+        self._push_change("constitution", self._spin_con.value())
+        self._push_change("intelligence", self._spin_int.value())
+        self._push_change("wisdom", self._spin_wis.value())
+        self._push_change("charisma", self._spin_cha.value())
 
     def _on_combat_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.current_hp = self._spin_hp.value()
-        self._creature.base_hp = self._spin_max_hp.value()
-        self._creature.ac1 = self._spin_ac.value()
-        self._creature.thac0 = self._spin_thac0.value()
-        self._creature.attacks = self._spin_attacks.value()
-        self._creature.exp = self._spin_xp.value()
-        self._creature.gold = self._spin_gold.value()
+        self._push_change("current_hp", self._spin_hp.value())
+        self._push_change("base_hp", self._spin_max_hp.value())
+        self._push_change("ac1", self._spin_ac.value())
+        self._push_change("thac0", self._spin_thac0.value())
+        self._push_change("attacks", self._spin_attacks.value())
+        self._push_change("exp", self._spin_xp.value())
+        self._push_change("gold", self._spin_gold.value())
 
     def _on_info_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.level_first_class = self._spin_level1.value()
-        self._creature.level_second_class = self._spin_level2.value()
-        self._creature.level_third_class = self._spin_level3.value()
-        self._creature.class_id = self._combo_class.currentData() or 0
-        self._creature.race = self._combo_race.currentData() or 0
-        self._creature.gender = self._combo_gender.currentData() or 0
-        self._creature.alignment = self._combo_alignment.currentData() or 0
-        self._creature.kit = self._combo_kit.currentData() or 0
+        self._push_change("level_first_class", self._spin_level1.value())
+        self._push_change("level_second_class", self._spin_level2.value())
+        self._push_change("level_third_class", self._spin_level3.value())
+        self._push_change("class_id", self._combo_class.currentData() or 0)
+        self._push_change("race", self._combo_race.currentData() or 0)
+        self._push_change("gender", self._combo_gender.currentData() or 0)
+        self._push_change("alignment", self._combo_alignment.currentData() or 0)
+        self._push_change("kit", self._combo_kit.currentData() or 0)
 
     def _on_saves_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.save_death = self._spin_save_death.value()
-        self._creature.save_wands = self._spin_save_wands.value()
-        self._creature.save_poly = self._spin_save_poly.value()
-        self._creature.save_breath = self._spin_save_breath.value()
-        self._creature.save_spells = self._spin_save_spells.value()
+        self._push_change("save_death", self._spin_save_death.value())
+        self._push_change("save_wands", self._spin_save_wands.value())
+        self._push_change("save_poly", self._spin_save_poly.value())
+        self._push_change("save_breath", self._spin_save_breath.value())
+        self._push_change("save_spells", self._spin_save_spells.value())
 
     def _on_resistances_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.resist_fire = self._spin_res_fire.value()
-        self._creature.resist_cold = self._spin_res_cold.value()
-        self._creature.resist_electricity = self._spin_res_elec.value()
-        self._creature.resist_acid = self._spin_res_acid.value()
-        self._creature.resist_magic = self._spin_res_magic.value()
-        self._creature.resist_slashing = self._spin_res_slash.value()
-        self._creature.resist_crushing = self._spin_res_crush.value()
-        self._creature.resist_piercing = self._spin_res_pierce.value()
-        self._creature.resist_missile = self._spin_res_missile.value()
+        self._push_change("resist_fire", self._spin_res_fire.value())
+        self._push_change("resist_cold", self._spin_res_cold.value())
+        self._push_change("resist_electricity", self._spin_res_elec.value())
+        self._push_change("resist_acid", self._spin_res_acid.value())
+        self._push_change("resist_magic", self._spin_res_magic.value())
+        self._push_change("resist_slashing", self._spin_res_slash.value())
+        self._push_change("resist_crushing", self._spin_res_crush.value())
+        self._push_change("resist_piercing", self._spin_res_pierce.value())
+        self._push_change("resist_missile", self._spin_res_missile.value())
 
     def _on_thief_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.open_locks = self._spin_open_locks.value()
-        self._creature.find_traps = self._spin_find_traps.value()
-        self._creature.pick_pockets = self._spin_pick_pockets.value()
-        self._creature.move_silently = self._spin_move_silently.value()
-        self._creature.hide_in_shadows = self._spin_hide_shadows.value()
-        self._creature.detect_illusions = self._spin_detect_illusions.value()
-        self._creature.set_traps = self._spin_set_traps.value()
+        self._push_change("open_locks", self._spin_open_locks.value())
+        self._push_change("find_traps", self._spin_find_traps.value())
+        self._push_change("pick_pockets", self._spin_pick_pockets.value())
+        self._push_change("move_silently", self._spin_move_silently.value())
+        self._push_change("hide_in_shadows", self._spin_hide_shadows.value())
+        self._push_change("detect_illusions", self._spin_detect_illusions.value())
+        self._push_change("set_traps", self._spin_set_traps.value())
 
     def _on_colors_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.metal_color = self._spin_metal.value()
-        self._creature.minor_color = self._spin_minor.value()
-        self._creature.major_color = self._spin_major.value()
-        self._creature.skin_color = self._spin_skin.value()
-        self._creature.leather_color = self._spin_leather.value()
-        self._creature.armor_color = self._spin_armor.value()
-        self._creature.hair_color = self._spin_hair.value()
-        self._creature.small_portrait = self._edit_small_portrait.text()
-        self._creature.large_portrait = self._edit_large_portrait.text()
+        self._push_change("metal_color", self._spin_metal.value())
+        self._push_change("minor_color", self._spin_minor.value())
+        self._push_change("major_color", self._spin_major.value())
+        self._push_change("skin_color", self._spin_skin.value())
+        self._push_change("leather_color", self._spin_leather.value())
+        self._push_change("armor_color", self._spin_armor.value())
+        self._push_change("hair_color", self._spin_hair.value())
+        self._push_change("small_portrait", self._edit_small_portrait.text())
+        self._push_change("large_portrait", self._edit_large_portrait.text())
 
     def _on_scripts_changed(self):
         if self._loading or not self._creature:
             return
-        self._creature.override_script = self._edit_override_script.text()
-        self._creature.class_script = self._edit_class_script.text()
-        self._creature.race_script = self._edit_race_script.text()
-        self._creature.general_script = self._edit_general_script.text()
-        self._creature.default_script = self._edit_default_script.text()
+        self._push_change("override_script", self._edit_override_script.text())
+        self._push_change("class_script", self._edit_class_script.text())
+        self._push_change("race_script", self._edit_race_script.text())
+        self._push_change("general_script", self._edit_general_script.text())
+        self._push_change("default_script", self._edit_default_script.text())
+
+    def _browse_portrait(self, size_filter: str, target_edit: QLineEdit):
+        from .portrait_browser import PortraitBrowserDialog
+        dialog = PortraitBrowserDialog(self, size_filter=size_filter)
+        if dialog.exec():
+            name = dialog.selected_portrait
+            if name:
+                target_edit.setText(name + size_filter)

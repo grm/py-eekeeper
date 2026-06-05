@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .constants import INF_MAX_CHARACTERS
 from .inf_creature import InfCreature
+from .inf_journal import JournalEntry, parse_journal_data, build_journal_data
 
 
 GAME_HEADER_SIZE = 0xB4
@@ -363,6 +364,43 @@ class InfGame:
         if 0 <= index < len(self._out_charinfo):
             return self._out_charinfo[index].name
         return ""
+
+    @property
+    def journal_count(self) -> int:
+        return struct.unpack_from("<I", self._header_data, GAME_JOURNAL_COUNT_OFFSET)[0]
+
+    @property
+    def journal_data(self) -> bytes:
+        return self._journal_data
+
+    @journal_data.setter
+    def journal_data(self, data: bytes):
+        self._journal_data = data
+        self._has_changed = True
+
+    def get_journal_entries(self) -> list[JournalEntry]:
+        return parse_journal_data(self._journal_data, self.journal_count)
+
+    def set_journal_entries(self, entries: list[JournalEntry]):
+        self._journal_data = build_journal_data(entries)
+        struct.pack_into("<I", self._header_data, GAME_JOURNAL_COUNT_OFFSET, len(entries))
+        self._has_changed = True
+
+    def add_out_of_party_character(self, cre: InfCreature, name: str):
+        raw_data = bytearray(CHARINFO_SIZE)
+        struct.pack_into("<H", raw_data, 0x02, 0xFFFF)
+        name_bytes = name.encode("latin-1")[:0x15].ljust(0x15, b"\x00")
+        raw_data[0xC0:0xD5] = name_bytes
+        ci = GameCharInfo(
+            party_position=0xFFFF,
+            cre_offset=0,
+            cre_size=0,
+            name=name,
+            raw_data=bytes(raw_data),
+        )
+        self._out_charinfo.append(ci)
+        self._out_party.append(cre)
+        self._has_changed = True
 
     def get_globals(self) -> list[GameGlobal]:
         return self._globals[:]

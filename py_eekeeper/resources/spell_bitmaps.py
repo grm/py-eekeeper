@@ -1,12 +1,14 @@
 """SpellBitmaps — loads spell/item icons from BAM resources."""
 
+import struct
+
 from PySide6.QtGui import QPixmap, QImage
 
 from ..formats.inf_bam import InfBam
 
 
 class SpellBitmaps:
-    """Manages spell icon loading from BAM resources."""
+    """Manages spell and item icon loading from BAM resources."""
 
     def __init__(self, resource_manager):
         self._resource_manager = resource_manager
@@ -22,6 +24,35 @@ class SpellBitmaps:
         if data is None:
             return None
 
+        pixmap = self._bam_to_pixmap(data, frame)
+        if pixmap:
+            self._cache[cache_key] = pixmap
+        return pixmap
+
+    def get_item_icon(self, item_res_name: str) -> QPixmap | None:
+        cache_key = f"itm:{item_res_name}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        from ..formats.constants import RESTYPE_ITM, RESTYPE_BAM
+        itm_data = self._resource_manager.get_resource(RESTYPE_ITM, item_res_name)
+        if not itm_data or len(itm_data) < 0x42:
+            return None
+
+        bam_name = itm_data[0x3A:0x42].decode("latin-1").rstrip("\x00")
+        if not bam_name:
+            return None
+
+        bam_data = self._resource_manager.get_resource(RESTYPE_BAM, bam_name)
+        if not bam_data:
+            return None
+
+        pixmap = self._bam_to_pixmap(bam_data, 0)
+        if pixmap:
+            self._cache[cache_key] = pixmap
+        return pixmap
+
+    def _bam_to_pixmap(self, data: bytes, frame: int) -> QPixmap | None:
         bam = InfBam()
         if not bam.read(data):
             return None
@@ -42,9 +73,7 @@ class SpellBitmaps:
                     r, g, b, a = pixels[idx]
                     image.setPixelColor(x, y, image.pixelColor(x, y).fromRgb(r, g, b, a))
 
-        pixmap = QPixmap.fromImage(image)
-        self._cache[cache_key] = pixmap
-        return pixmap
+        return QPixmap.fromImage(image)
 
     def clear_cache(self):
         self._cache.clear()

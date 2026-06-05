@@ -1,8 +1,11 @@
 """Main application logic — EEKeeper singleton."""
 
+import logging
+import shutil
 import struct
 from pathlib import Path
 
+from .backup import create_backup
 from .config import Config
 from .formats.inf_tlk import InfTlk
 from .formats.inf_game import InfGame, find_baldur_gam
@@ -12,6 +15,9 @@ from .formats.constants import RESTYPE_SPL, RESTYPE_ITM, RESTYPE_2DA, RESTYPE_ID
 from .resources.resource_manager import ResourceManager
 from .resources.value_list import ValueList, ValueItem
 from .resources.spell_bitmaps import SpellBitmaps
+
+
+logger = logging.getLogger(__name__)
 
 
 class EEKeeperApp:
@@ -222,6 +228,29 @@ class EEKeeperApp:
 
     def save_game(self) -> bool:
         if not self.game or not self._gam_path:
+            return False
+
+        if self.config.auto_backup and self._save_path:
+            save_dir = Path(self._save_path)
+            backup_path = create_backup(save_dir)
+            if backup_path:
+                logger.info("Backup created at %s", backup_path)
+            else:
+                logger.warning("Backup failed for %s, proceeding with save", save_dir)
+
+        return self.game.write(self._gam_path)
+
+    def save_game_as(self, new_name: str) -> bool:
+        if not self.game or not self._save_path:
+            return False
+        src = Path(self._save_path)
+        dest = src.parent / new_name
+        if dest.exists():
+            return False
+        shutil.copytree(src, dest)
+        self._save_path = str(dest)
+        self._gam_path = find_baldur_gam(dest)
+        if not self._gam_path:
             return False
         return self.game.write(self._gam_path)
 

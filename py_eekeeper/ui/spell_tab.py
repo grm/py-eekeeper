@@ -3,12 +3,14 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QListWidget, QListWidgetItem, QPushButton, QComboBox, QLabel,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
 from ..formats.inf_creature import InfCreature, KnownSpell
 from ..formats.constants import INF_CRE_ST_WIZARD, INF_CRE_ST_PRIEST, INF_CRE_ST_INNATE
 from ..app import EEKeeperApp
+from ..resources.descriptions import get_spell_description
 
 
 class SpellTab(QWidget):
@@ -76,6 +78,9 @@ class SpellTab(QWidget):
         self._btn_add_all = QPushButton("Add All")
         self._btn_add_all.clicked.connect(self._on_add_all)
         btn_layout2.addWidget(self._btn_add_all)
+        self._btn_browse = QPushButton("Browse...")
+        self._btn_browse.clicked.connect(self._on_browse)
+        btn_layout2.addWidget(self._btn_browse)
         avail_layout.addLayout(btn_layout2)
         content_layout.addWidget(avail_group)
 
@@ -107,6 +112,9 @@ class SpellTab(QWidget):
             item = QListWidgetItem(f"{spell.name} - {friendly_name} (L{spell.level + 1})")
             item.setData(Qt.ItemDataRole.UserRole, spell.name)
             item.setData(Qt.ItemDataRole.UserRole + 1, spell.level)
+            desc = get_spell_description(spell.name)
+            if desc:
+                item.setToolTip(desc)
             self._list_known.addItem(item)
 
     def _load_available_spells(self):
@@ -146,13 +154,42 @@ class SpellTab(QWidget):
             item = QListWidgetItem(f"{res_name} - {friendly_name} (L{level + 1})")
             item.setData(Qt.ItemDataRole.UserRole, res_name)
             item.setData(Qt.ItemDataRole.UserRole + 1, level)
+            desc = get_spell_description(res_name)
+            if desc:
+                item.setToolTip(desc)
             self._list_available.addItem(item)
+
+    def _can_add_spell(self, show_warning: bool = True) -> bool:
+        """Check if adding another known spell is allowed by the configured limit.
+
+        Returns True if the spell can be added, False otherwise.
+        """
+        app = EEKeeperApp.instance()
+        if not app.config.use_known_spell_limit:
+            return True
+        if not self._creature:
+            return True
+
+        current_count = len(self._creature.get_known_spells(self._current_type))
+        if current_count >= app.config.known_spell_limit:
+            if show_warning:
+                QMessageBox.warning(
+                    self,
+                    "Spell Limit Reached",
+                    f"Cannot add more spells. The known spell limit "
+                    f"({app.config.known_spell_limit}) has been reached "
+                    f"for this spell type.",
+                )
+            return False
+        return True
 
     def _on_add(self):
         if not self._creature:
             return
         item = self._list_available.currentItem()
         if not item:
+            return
+        if not self._can_add_spell():
             return
         name = item.data(Qt.ItemDataRole.UserRole)
         level = item.data(Qt.ItemDataRole.UserRole + 1)
@@ -164,6 +201,15 @@ class SpellTab(QWidget):
         if not self._creature:
             return
         for i in range(self._list_available.count()):
+            if not self._can_add_spell(show_warning=False):
+                QMessageBox.warning(
+                    self,
+                    "Spell Limit Reached",
+                    f"Stopped adding spells. The known spell limit "
+                    f"({EEKeeperApp.instance().config.known_spell_limit}) "
+                    f"has been reached for this spell type.",
+                )
+                break
             item = self._list_available.item(i)
             name = item.data(Qt.ItemDataRole.UserRole)
             level = item.data(Qt.ItemDataRole.UserRole + 1)
@@ -190,3 +236,26 @@ class SpellTab(QWidget):
             self._creature.remove_known_spell(self._current_type, spell.name)
         self._refresh_list()
         self._load_available_spells()
+
+    def _on_browse(self):
+        if not self._creature:
+            return
+        prefixes = {
+            INF_CRE_ST_WIZARD: "SPWI",
+            INF_CRE_ST_PRIEST: "SPPR",
+            INF_CRE_ST_INNATE: "SPCL",
+        }
+        from .spell_browser import SpellBrowserDialog
+        dialog = SpellBrowserDialog(self, spell_type=prefixes.get(self._current_type, ""))
+        if dialog.exec():
+            res_name = dialog.selected_spell
+            if res_name:
+                if not self._can_add_spell():
+                    return
+                try:
+                    level = int(res_name[4]) - 1
+                except (IndexError, ValueError):
+                    level = 0
+                self._creature.add_known_spell(self._current_type, res_name, level)
+                self._refresh_list()
+                self._load_available_spells()

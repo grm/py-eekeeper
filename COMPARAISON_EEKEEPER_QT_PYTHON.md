@@ -19,7 +19,7 @@ The legacy Qt project is not stored directly in the Python repository. The compa
 
 The main difference is that legacy `eekeeper-qt` is a partial but fairly dense C++/Qt port of Shadow Keeper logic, with a large amount of historical code, binary structures, and planned dialogs. The Python version is smaller, more testable, more readable, and better split into modules, but it does not yet cover the full application surface visible or planned in the old Qt version.
 
-The Python parsers are already close to parity for several critical formats: `GAM`, `CRE`, `CHR`, `KEY`, `BIF`, `TLK`, `2DA`, `BAM`, and `AFF`. Python's strongest advantage is automated testing. Its largest gap is the advanced UI: there are no full item/spell browsers, no generic globals/journal/affects editors, `.CHR` import is not integrated into the save game, there is no `Save As`, and several dialogs exist but are not wired into the application.
+The Python parsers are already close to parity for several critical formats: `GAM`, `CRE`, `CHR`, `KEY`, `BIF`, `TLK`, `2DA`, `BAM`, and `AFF`. Python's strongest advantage is automated testing. The UI gap has been largely closed: item/spell/portrait browsers, globals/journal/affects editors, `.CHR` import integration into the save game, `Save As`, a full settings dialog, and a dedicated Game tab for party-level editing are all implemented. The remaining gaps are primarily: creature browser, local variables editor, and documented Windows support.
 
 ---
 
@@ -33,7 +33,7 @@ The Python parsers are already close to parity for several critical formats: `GA
 | Announced platforms | Windows, Linux, macOS | Linux, macOS |
 | Automated tests | No tests found | `pytest`, 43 tests, 42 pass locally |
 | Architecture | Historical globals and singletons | `formats`, `resources`, `ui`, `app`, `config` modules |
-| UI | Many `.ui` dialogs, some stubs | More compact UI, several orphaned dialogs |
+| UI | Many `.ui` dialogs, some stubs | Comprehensive: 7 tabs, 8+ dialogs, toolbar |
 | Format engine | Very complete for its time | Already substantial and more testable |
 | Functional maturity | Partial editing, much historical logic | Partial editing, better validation base |
 
@@ -67,7 +67,7 @@ The Python version is organized around:
 - `py_eekeeper/ui/`: PySide6 interface;
 - `tests/`: unit tests and synthetic integration tests.
 
-This organization is cleaner than the old Qt code: formats, resources, and UI are better separated. However, `SPEC.md` still describes files or behaviors that are not all present in the current code, such as `pal_image_list.py`, `spell_browser.py`, `item_browser.py`, or `data/kits.dat`.
+This organization is cleaner than the old Qt code: formats, resources, and UI are better separated. `spell_browser.py` and `item_browser.py` are now present and functional. `SPEC.md` still describes files that are not present: `pal_image_list.py` and `data/kits.dat`.
 
 ---
 
@@ -207,8 +207,8 @@ Differences:
 
 - the old Qt UI mainly exposes party characters; out-of-party characters are read but barely or not manipulated;
 - Python displays an `[NPC]` marker for out-of-party characters in `SavedGameWidget`, but full out-of-party editing still depends on the current UI flow and should be verified;
-- Python preserves the journal and unknown blocks as binary data, without an editor;
-- Python exposes `party_gold`, `party_reputation`, `get_globals`, and `set_globals`, but the UI does not yet provide a global editor.
+- Python now exposes a Journal Editor dialog (`ui/journal_editor.py`) with full add/edit/remove and text preview from TLK, backed by `formats/inf_journal.py`;
+- Python exposes `party_gold`, `party_reputation`, `get_globals`, and `set_globals` through a dedicated Game tab and a Global Variables Editor dialog (`ui/globals_editor.py`).
 
 ### 8.3 CRE
 
@@ -238,7 +238,7 @@ Differences:
 |---|---|---|
 | Inventory slot count | Historical code aligned with 38 useful slots | Current code constant `INF_NUM_ITEMSLOTS = 38` in modified code |
 | Slot documentation | UI/spec sometimes mention 39 | Python README/SPEC still mention 39 in places |
-| Generic affects | Parser present, UI tab empty | Model present, no generic UI editor |
+| Generic affects | Parser present, UI tab empty | Model present, full Affects tab with add/edit/remove (`ui/affects_tab.py`, `ui/affect_edit_dialog.py`) |
 | Speed | Observed Qt bug: wrong UI line read | Python has `get_speed`/`set_speed`, not widely exposed |
 | Proficiencies | Through affects + dual-class tribbles | Through affects + Python constants |
 | Memorized spells without known spell | Preserved in Qt | Mechanism should be watched/validated in Python |
@@ -252,10 +252,10 @@ The Python code appears to have made strong progress on binary CRE fidelity, but
 |---|---|---|
 | `.CHR` parser | Yes | Yes |
 | Export | Planned / partially wired depending on UI | Yes through `export_character` |
-| Import | Historical goal of replacement/addition | Reads `.CHR`, displays status, does not yet modify the save |
-| Overwrite policy | Settings present | Settings present but barely used |
+| Import | Historical goal of replacement/addition | Reads `.CHR`, integrates into GAM via `add_out_of_party_character()`, user is asked to add to reserves |
+| Overwrite policy | Settings present | Settings present, `allow_chr_overwrite` in settings dialog |
 
-The major gap is Python import: it parses the character but does not yet integrate it into the `GAM`.
+Python import now achieves parity: the character is parsed from `.CHR` and integrated into the party reserves through `InfGame.add_out_of_party_character()`. The main window refreshes `SavedGameWidget` after import.
 
 ### 8.5 TLK
 
@@ -283,7 +283,7 @@ Both versions can decode BAM.
 Differences:
 
 - old Qt uses spell bitmaps and palette mechanisms for display;
-- Python has `SpellBitmaps`, but icons are not yet wired into spell or inventory tabs;
+- Python has `SpellBitmaps` with spell icons wired into `SpellBrowserDialog` and item icons wired into `ItemBrowserDialog` via `get_item_icon()` (reads ITM header offset 0x3A for BAM reference);
 - Python has no observed `PalImageList`, even though the specification mentions it.
 
 ---
@@ -294,16 +294,16 @@ Differences:
 
 | Element | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| File menu | Open Saved Game, Open Character, Open Creature, Save, Exit planned | Open Save, Save, Export Character, Import Character, Quit |
-| Save As | Present through historical dialog/flow | Missing from the main window |
-| View | Dockable item/spell/creature browsers planned | Missing |
-| Tools | No strict equivalent | String Finder |
-| Options / Settings | Installation Directory, lists, various options | Installation Directory |
+| File menu | Open Saved Game, Open Character, Open Creature, Save, Exit planned | Open Save, Save, Save As, Export Character, Import Character, Quit |
+| Save As | Present through historical dialog/flow | Present — `SaveGameNameDialog` + `app.save_game_as()` (Ctrl+Shift+S) |
+| View | Dockable item/spell/creature browsers planned | Missing (browsers are dialogs, not docked panels) |
+| Tools | No strict equivalent | String Finder, Global Variables, Journal |
+| Options / Settings | Installation Directory, lists, various options | Installation Directory, Settings (4-tab dialog: General, Spells, Display, Advanced) |
 | Help | About/Readme/Website planned but incomplete | About |
-| Toolbar | Open/Save/Web/About planned | No equivalent observed |
-| Layout | Window + tabs + historical widgets | Vertical splitter + party bar + tabs |
+| Toolbar | Open/Save/Web/About planned | Open, Save, Save As, Export, Import, String Finder with separators |
+| Layout | Window + tabs + historical widgets | Vertical splitter + party bar + tabs (Game, Character, Spells, Memorization, Proficiencies, Inventory, Affects) |
 
-The Python version is simpler and more compact. It favors already wired features rather than declaring many unimplemented actions. However, this also means that several historical features visible in the old Qt UI do not yet exist in the new UI.
+The Python version now covers most main window actions present in the legacy Qt version. The toolbar is functional with grouped buttons, and the menu structure exposes all major features through File, Tools, and Options menus.
 
 ### 9.2 Opening Save Games
 
@@ -319,18 +319,17 @@ The Python version is simpler and more compact. It favors already wired features
 **py-eekeeper**:
 
 - dedicated dialog;
-- lists `save` and `mpsave`;
+- lists `save`, `mpsave`, and `bpsave` (Black Pits);
 - opens directories containing `BALDUR.GAM`;
 - displays characters in `SavedGameWidget`;
 - handles portraits from save BMP files;
-- does not seem to explicitly cover Black Pits yet;
 - Quick-Save / Auto-Save exclusion should be verified in the current Python flow.
 
 ### 9.3 Character Bar / Selection
 
 `eekeeper-qt` uses a `SavedGameWidget` and creates a `CharacterSheetWidget` for each in-party member. NPCs/out-of-party characters are read but barely exposed.
 
-`py-eekeeper` also has a `SavedGameWidget`, displays characters, and can show an `[NPC]` marker for out-of-party characters. Selection feeds a fixed set of tabs: Character, Spells, Memorization, Proficiencies, Inventory.
+`py-eekeeper` also has a `SavedGameWidget`, displays characters, and can show an `[NPC]` marker for out-of-party characters. Selection feeds a set of tabs: Game, Character, Spells, Memorization, Proficiencies, Inventory, Affects. The Game tab is always active (party-level data), while other tabs load per-character data on selection.
 
 ---
 
@@ -374,14 +373,13 @@ The Python version covers the most useful character editing fields, but not the 
 **py-eekeeper**:
 
 - displays 38 rows;
-- supports `Set Item` through `QInputDialog.getItem` over the ITM list;
+- supports `Set Item` through a full graphical `ItemBrowserDialog` with search filter, item icons from BAM, and name display;
 - supports `Remove`;
 - supports `Identify All`;
-- does not show item icons;
-- does not provide a full graphical browser with filters, categories, or descriptions;
+- item icons are shown in the browser dialog via `SpellBitmaps.get_item_icon()`;
 - displays quantities but does not provide rich charge/quantity editing.
 
-Python therefore surpasses old Qt for effective basic inventory editing, but remains far from a complete item browser.
+Python surpasses old Qt for effective inventory editing and now includes a graphical item browser.
 
 ### 10.3 Known Spells
 
@@ -399,11 +397,10 @@ Python therefore surpasses old Qt for effective basic inventory editing, but rem
 - level filter;
 - Known and Available lists;
 - Add, Add All, Remove, Remove All buttons;
-- names retrieved through TLK/SPL;
-- no dedicated graphical browser;
-- no BAM icons in the tab.
+- Browse... button opens `SpellBrowserDialog` with type/level filters, search, and BAM icons;
+- names retrieved through TLK/SPL.
 
-Python is more usable for adding/removing known spells, but does not yet have the planned visual richness.
+Python is more usable for adding/removing known spells and now includes a full graphical spell browser with icons.
 
 ### 10.4 Memorization
 
@@ -451,7 +448,17 @@ In `eekeeper-qt`, some tabs or areas exist but are empty or barely wired:
 - Journal Entries;
 - Item/Spell/Creature browsers.
 
-In `py-eekeeper`, these areas are not yet exposed as equivalent tabs. Data is sometimes preserved or parsed, but not editable in the UI.
+In `py-eekeeper`, most of these are now implemented:
+
+- **Affects tab** (`ui/affects_tab.py`): full table of creature affects with add/edit/remove and a detailed edit dialog (`ui/affect_edit_dialog.py`) covering all 18 InfAffect fields;
+- **Game tab** (`ui/game_tab.py`): dedicated tab for party gold, reputation, with buttons to open Globals and Journal editors;
+- **Global Variables**: full editor dialog (`ui/globals_editor.py`) with table, filter, add/remove;
+- **Journal Entries**: full editor dialog (`ui/journal_editor.py`) with text preview from TLK;
+- **Item Browser**: dialog (`ui/item_browser.py`) with icons, search filter;
+- **Spell Browser**: dialog (`ui/spell_browser.py`) with type/level filters, icons, search;
+- **Portrait Browser**: dialog (`ui/portrait_browser.py`) scanning game directories for BMP/PNG/JPG, grid view with thumbnails.
+
+Remaining gaps: Appearance tab, Local Variables editor, Creature browser.
 
 ---
 
@@ -461,12 +468,17 @@ In `py-eekeeper`, these areas are not yet exposed as equivalent tabs. Data is so
 |---|---|---|---|
 | Installation Directory | Yes, incomplete Linux validation | Yes, Steam auto-detection | Python more complete |
 | Open Saved Game | Yes | Yes | Qt covers more save types |
-| Save Game Name | Yes, used for save-as/rename | File present but not wired | Python incomplete |
+| Save Game Name | Yes, used for save-as/rename | Yes, wired through File > Save As (Ctrl+Shift+S) | Parity |
 | ValueListDialog | Yes, wired for Kits/Affects | File present but not wired | Python incomplete |
 | ValueItemDialog | Yes | No equivalent standalone dialog observed | Python incomplete |
 | StringFinderDialog | Yes | Yes | Python limits/structures results |
-| SpellBrowserWidget | UI/stub | Missing | No complete browser |
-| ItemBrowserWidget | UI/stub | Missing | No complete browser |
+| SpellBrowserDialog | UI/stub | Yes, full dialog with type/level filters, icons, search | Python better |
+| ItemBrowserDialog | UI/stub | Yes, full dialog with search filter and item icons | Python better |
+| PortraitBrowserDialog | Not present | Yes, scans game directories, grid thumbnail view | Python only |
+| GlobalsEditorDialog | Empty tab | Yes, full table editor with filter, add/remove | Python better |
+| JournalEditorDialog | Empty tab | Yes, full editor with TLK text preview | Python better |
+| AffectEditDialog | Empty tab | Yes, 18-field editor in 3 grouped sections | Python better |
+| SettingsDialog | Various options in menus | Yes, 4-tab dialog (General, Spells, Display, Advanced) | Parity |
 | About | Planned/incomplete | Simple implementation | Python more wired |
 
 ---
@@ -486,7 +498,7 @@ Both versions can rewrite `BALDUR.GAM`, recalculate offsets, and reinject modifi
 - adjacent file copy;
 - new `BALDUR.GAM` write.
 
-`py-eekeeper` currently only exposes `File -> Save` in the main window. `save_game_name_dialog.py` exists but is not wired.
+`py-eekeeper` now exposes `File -> Save As` (Ctrl+Shift+S) which opens `SaveGameNameDialog`, then calls `app.save_game_as(new_name)`. The implementation copies the save directory with `shutil.copytree`, updates internal paths, and writes the modified GAM to the new location.
 
 ### 12.3 Closing With Changes
 
@@ -531,7 +543,7 @@ The Python version does not try to reproduce the Qt `.uld` format. This is a use
 | Linux | Dedicated UI, stubbed install validation | Linux announced, Steam auto-detection |
 | macOS | Dedicated UI, `.app/Contents/Resources` validation | macOS announced, Steam auto-detection |
 | Documents | Settings and manual paths | Linux/macOS defaults |
-| Black Pits | `bpsave/` directory planned | Unclear / not explicitly exposed |
+| Black Pits | `bpsave/` directory planned | `bpsave/` exposed in Open dialog (dedicated tab) |
 | Multiplayer saves | `mpsave/` | `mpsave/` |
 
 Python simplifies the platform target by leaving Windows out for now. This is consistent with the README, but it is a coverage regression compared with the old project.
@@ -607,13 +619,13 @@ The repository contains:
 
 | Documented topic | Observed state |
 |---|---|
-| `Full inventory editor (39 equipment slots)` | Current code is closer to 38 slots; basic editing, no full browser |
-| `Export/import characters` | Export OK, import only parses and does not modify the party |
-| `spell_browser.py` / `item_browser.py` | Mentioned in `SPEC.md`, not present |
+| `Full inventory editor (39 equipment slots)` | Current code uses 38 slots (`INF_NUM_ITEMSLOTS = 38`); full item browser now present |
+| `Export/import characters` | Export OK, import now integrates character into GAM party reserves |
+| `spell_browser.py` / `item_browser.py` | Now present and functional (`ui/spell_browser.py`, `ui/item_browser.py`) |
 | `pal_image_list.py` | Mentioned in `SPEC.md`, not present |
 | `data/kits.dat` | Mentioned in `SPEC.md`, not present |
 | splash screen | Mentioned in `SPEC.md`, not observed |
-| `Save As` toolbar | Mentioned in `SPEC.md`, not wired |
+| `Save As` toolbar | Now wired — toolbar button + File menu action (Ctrl+Shift+S) |
 | class-based proficiency filtering | Mentioned, not observed |
 
 The specification remains useful as a target, but it should be treated as an intent document, not as an exact description of the current state.
@@ -644,28 +656,32 @@ The specification remains useful as a target, but it should be treated as an int
 
 ### 17.2 Qt Features or Behaviors Missing/Incomplete in Python
 
-- `Save As` with creation of a new save folder.
-- Full save rename through `SaveGameNameDialog`.
-- Graphical item browser.
-- Graphical spell browser.
+**Now implemented:**
+
+- ~~`Save As` with creation of a new save folder.~~ → Done via `app.save_game_as()`.
+- ~~Full save rename through `SaveGameNameDialog`.~~ → Wired through File > Save As.
+- ~~Graphical item browser.~~ → `ui/item_browser.py` with icons and search.
+- ~~Graphical spell browser.~~ → `ui/spell_browser.py` with type/level filters and icons.
+- ~~Generic affects editor.~~ → `ui/affects_tab.py` + `ui/affect_edit_dialog.py`.
+- ~~Global variables editor.~~ → `ui/globals_editor.py`.
+- ~~Journal editor.~~ → `ui/journal_editor.py` + `formats/inf_journal.py`.
+- ~~Portrait change through a browser.~~ → `ui/portrait_browser.py` wired into character sheet.
+- ~~Historical toolbar.~~ → Toolbar with Open, Save, Save As, Export, Import, String Finder.
+- ~~Complete View/Settings menus.~~ → Settings dialog with 4 tabs.
+- ~~`.CHR` import into the party or character replacement.~~ → `InfGame.add_out_of_party_character()`.
+- ~~Visible spell/item icons.~~ → Icons in browser dialogs via `SpellBitmaps`.
+
+**Still missing:**
+
 - Creature browser.
-- Custom Kits/Affects list editor.
-- Generic affects editor.
-- Global variables editor.
+- Custom Kits/Affects list editor (`.uld` equivalent).
 - Local variables editor.
-- Journal editor.
 - Appearance tab equivalent to the old UI.
-- Portrait change through a browser.
-- Explicit Black Pits handling.
+- ~~Explicit Black Pits handling.~~ (done: `bpsave/` tab in Open dialog)
 - Documented Windows support.
-- Historical toolbar.
-- Complete View/Settings menus.
-- Effective enforcement of known/memorized spell limits.
-- Grid option application.
-- Complete CHR/CRE overwrite policy.
-- `.CHR` import into the party or character replacement.
-- Visible spell/item icons.
-- Character palette images.
+- Effective enforcement of known/memorized spell limits (settings exist but not enforced in add flows).
+- Grid option application (setting exists, not applied to all tables).
+- Character palette images (`PalImageList`).
 
 ### 17.3 Python Features That Are More Advanced or Better Structured
 
@@ -718,7 +734,7 @@ The specification remains useful as a target, but it should be treated as an int
 | `CInf2DA` | `Inf2DA` | close |
 | `CInfBam` | `InfBam` | close |
 | `CValueList` | `ValueList` | different format |
-| `CSpellBitmaps` | `SpellBitmaps` | present but barely wired to UI |
+| `CSpellBitmaps` | `SpellBitmaps` | wired to spell and item browser dialogs |
 | `CPalImageList` | missing | gap |
 
 ### 18.3 UI
@@ -732,10 +748,17 @@ The specification remains useful as a target, but it should be treated as an int
 | `SpellTab` | `SpellTab` | Python more editable |
 | `MemorizationTab` | `MemorizationTab` | close |
 | `ProficienciesTab` | `ProficienciesTab` | close |
-| `SpellBrowserWidget` | missing | gap |
-| `ItemBrowserWidget` | missing | gap |
+| `SpellBrowserWidget` | `SpellBrowserDialog` | functional with icons |
+| `ItemBrowserWidget` | `ItemBrowserDialog` | functional with icons |
 | `ValueListDialog` | present but orphaned | missing from menu |
-| `SaveGameNameDialog` | present but orphaned | missing from menu |
+| `SaveGameNameDialog` | wired through Save As | parity |
+| — | `GameTab` | dedicated party tab |
+| — | `AffectsTab` | full affects editor |
+| — | `GlobalsEditorDialog` | full table editor |
+| — | `JournalEditorDialog` | full entry editor |
+| — | `PortraitBrowserDialog` | grid thumbnail browser |
+| — | `SettingsDialog` | 4-tab config editor |
+| — | `AffectEditDialog` | 18-field editor |
 | `InstallationDirectory` | `InstallationDialog` | Python more practical |
 
 ---
@@ -746,23 +769,30 @@ The specification remains useful as a target, but it should be treated as an int
 |---|---|---|---|
 | Open save | Yes | Yes | Parity |
 | Save game | Yes | Yes | Parity |
-| Save As | Yes | No | Python behind |
+| Save As | Yes | Yes | Parity |
 | Edit main stats | Yes | Yes | Parity |
 | Edit known spells | Partial | Yes | Python better wired |
 | Edit memorization | Yes | Yes | Partial parity |
 | Edit proficiencies | Yes | Yes | Parity |
-| Edit inventory UI | Read-only | Basic | Python better |
-| Edit generic affects | No UI | No UI | Low parity |
-| Edit globals/journal | No UI | No UI | Low parity |
+| Edit inventory UI | Read-only | Full browser | Python better |
+| Edit generic affects | No UI | Full tab + edit dialog | Python better |
+| Edit globals | No UI | Full dialog editor | Python better |
+| Edit journal | No UI | Full dialog editor | Python better |
+| Edit gold/reputation | Model only | Dedicated Game tab | Python better |
 | Export CHR | Partial | Yes | Python better |
-| Import CHR | Planned | Parse only | Python incomplete |
+| Import CHR | Planned | Full integration into party | Python better |
 | String finder | Yes | Yes | Parity |
-| Item browser | Stub | Missing | Low parity |
-| Spell browser | Stub | Missing | Low parity |
+| Item browser | Stub | Full dialog with icons | Python better |
+| Spell browser | Stub | Full dialog with icons | Python better |
+| Portrait browser | Not present | Full dialog with thumbnails | Python only |
+| Settings dialog | Scattered options | 4-tab dialog | Python better |
+| Toolbar | Planned | Functional with 6 actions | Python better |
 | Auto-detect install | Stub | Yes | Python better |
 | Automated tests | No | Yes | Python better |
 | Windows | Yes | No | Qt better |
-| Black Pits saves | Yes | Unclear | Qt better |
+| Black Pits saves | Yes | Yes (dedicated tab) | Parity |
+| Creature browser | Stub | Missing | Low parity |
+| Local variables | No UI | Missing | Low parity |
 
 ---
 
@@ -783,30 +813,34 @@ Even though the Python UI is already usable, the following points must be valida
 
 ## 21. Convergence Recommendations
 
-To reach useful parity with `eekeeper-qt` without copying its technical debt, the recommended order is:
+Most historical recommendations have been implemented. Remaining priorities:
 
-1. **Wire existing dialogs**: `SaveGameNameDialog`, `ValueListDialog`.
-2. **Complete CHR import** into the `GAM`.
-3. **Add a party/global editor**: gold, reputation, globals.
-4. **Create Item/Spell browsers** with BAM icons.
-5. **Expose advanced CRE fields**: racial enemy, speed, flags, detailed AC.
-6. **Validate on real save games** and add integration tests with game fixtures.
-7. **Fix documentation** (`README`, `SPEC`) to reflect 38 slots, the real import state, and the lack of Windows support.
+1. ~~Wire existing dialogs~~ → Done.
+2. ~~Complete CHR import into the GAM~~ → Done.
+3. ~~Add a party/global editor~~ → Done (Game tab, globals editor, journal editor).
+4. ~~Create Item/Spell browsers with BAM icons~~ → Done.
+5. **Expose advanced CRE fields**: racial enemy, speed, flags, detailed AC, morale/fatigue/intoxication/luck.
+6. **Add a creature browser** and **local variables editor**.
+7. **Wire `ValueListDialog`** from the UI (currently still orphaned).
+8. **Validate on real save games** and add integration tests with game fixtures.
+9. **Fix documentation** (`README`, `SPEC`) to reflect 38 slots and the current feature state.
+10. **Enforce spell limits** at add-time when the setting is active.
+11. **Apply grid option** to all table widgets when the setting is toggled.
 
 ---
 
 ## 22. Conclusion
 
-`py-eekeeper` is not a line-by-line translation of `eekeeper-qt`. It is a more modern, more testable, and more maintainable rewrite that has already recovered the core format engine and a large part of character editing.
+`py-eekeeper` is not a line-by-line translation of `eekeeper-qt`. It is a more modern, more testable, and more maintainable rewrite that has recovered the core format engine and now surpasses the legacy Qt version in most functional areas.
 
 Compared with old Qt:
 
 - **the binary engine is already close, and stronger on testability**;
-- **the basic UI is more coherent for effective spell and inventory editing**;
-- **advanced UI, extended save management, and several historical tools are still missing**;
-- **Python documentation sometimes overstates the real code state**.
+- **the UI now covers more functional ground than the legacy Qt version** — including areas (affects editor, globals editor, journal editor, item/spell/portrait browsers) that were only stubs or empty tabs in `eekeeper-qt`;
+- **Save As, CHR import integration, settings, and toolbar are all functional**;
+- **remaining gaps are narrow**: creature browser, local variables, appearance tab, and Windows support.
 
-In practice, `eekeeper-qt` remains a useful reference for subtle binary behaviors and historical editor intentions, while `py-eekeeper` is already a better technical foundation for finishing the product, provided the UI and workflow gaps listed in this report are closed.
+In practice, `py-eekeeper` is now a more complete editor than `eekeeper-qt` ever was for most use cases. The legacy Qt project remains useful only as a reference for subtle binary behaviors and edge-case CRE fields not yet exposed in the Python UI.
 
 ---
 
