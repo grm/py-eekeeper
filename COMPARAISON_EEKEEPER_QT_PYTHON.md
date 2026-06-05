@@ -1,94 +1,94 @@
-# Comparaison exhaustive entre eekeeper-qt et py-eekeeper
+# Exhaustive Comparison Between eekeeper-qt and py-eekeeper
 
-## 1. Périmètre de comparaison
+## 1. Comparison Scope
 
-Ce rapport compare :
+This report compares:
 
-- l'ancienne application C++/Qt **eekeeper-qt**, analysée depuis le dépôt amont [Goddard/eekeeper-qt](https://github.com/Goddard/eekeeper-qt) cloné localement dans `/tmp/eekeeper-qt` au commit `41b612e` ;
-- l'implémentation Python/PySide6 **py-eekeeper**, analysée sur l'état courant du working tree de ce dépôt.
+- the legacy C++/Qt application **eekeeper-qt**, analyzed from the upstream [Goddard/eekeeper-qt](https://github.com/Goddard/eekeeper-qt) repository cloned locally at `/tmp/eekeeper-qt` at commit `41b612e`;
+- the **py-eekeeper** Python/PySide6 implementation, analyzed from the current working tree of this repository.
 
-Le dépôt Python contient des modifications non commitées au moment de l'analyse, notamment dans les parsers de formats, la gestion des ressources, l'UI inventaire et les tests. Le rapport décrit donc l'état réel observé dans les fichiers, pas seulement la documentation.
+The Python repository had uncommitted changes at the time of analysis, especially in format parsers, resource management, the inventory UI, and tests. This report therefore describes the observed state of the files, not only the documentation.
 
-L'ancien projet Qt n'est pas présent directement dans le dépôt Python. La comparaison repose sur le code source amont C++/Qt, sur `SPEC.md`, sur `README.md`, sur le code Python actuel et sur l'exécution de la suite de tests Python.
-
----
-
-## 2. Synthèse exécutive
-
-`py-eekeeper` reprend correctement la direction générale de `eekeeper-qt` : même domaine fonctionnel, même logique d'ouverture d'une sauvegarde `BALDUR.GAM`, même dépendance aux ressources Infinity Engine (`KEY/BIF/TLK/2DA/BAM`), et même objectif d'éditer les personnages contenus dans une sauvegarde.
-
-La différence principale est que l'ancien `eekeeper-qt` est un port C++/Qt partiel mais relativement dense de la logique Shadow Keeper, avec beaucoup de code historique, de structures binaires et de dialogues prévus. La version Python est plus petite, plus testable, plus lisible et mieux isolée en modules, mais elle ne couvre pas encore toute la surface applicative visible ou prévue dans l'ancien Qt.
-
-Les parsers Python sont déjà proches de la parité sur plusieurs formats critiques : `GAM`, `CRE`, `CHR`, `KEY`, `BIF`, `TLK`, `2DA`, `BAM`, `AFF`. La plus grosse avance Python est la présence de tests automatisés. Le plus gros retard Python est dans l'interface avancée : pas de vrais navigateurs d'items/sorts, pas d'éditeur de variables globales/journal/affects génériques, import `.CHR` non intégré à la sauvegarde, pas de `Save As`, et plusieurs dialogues existent mais ne sont pas branchés.
+The legacy Qt project is not stored directly in the Python repository. The comparison is based on the upstream C++/Qt source code, `SPEC.md`, `README.md`, the current Python code, and the Python test suite execution.
 
 ---
 
-## 3. État global des deux projets
+## 2. Executive Summary
 
-| Domaine | eekeeper-qt C++/Qt | py-eekeeper Python/PySide6 |
+`py-eekeeper` correctly follows the same overall direction as `eekeeper-qt`: the same functional domain, the same save-opening flow around `BALDUR.GAM`, the same dependency on Infinity Engine resources (`KEY/BIF/TLK/2DA/BAM`), and the same goal of editing characters stored inside a save game.
+
+The main difference is that legacy `eekeeper-qt` is a partial but fairly dense C++/Qt port of Shadow Keeper logic, with a large amount of historical code, binary structures, and planned dialogs. The Python version is smaller, more testable, more readable, and better split into modules, but it does not yet cover the full application surface visible or planned in the old Qt version.
+
+The Python parsers are already close to parity for several critical formats: `GAM`, `CRE`, `CHR`, `KEY`, `BIF`, `TLK`, `2DA`, `BAM`, and `AFF`. Python's strongest advantage is automated testing. Its largest gap is the advanced UI: there are no full item/spell browsers, no generic globals/journal/affects editors, `.CHR` import is not integrated into the save game, there is no `Save As`, and several dialogs exist but are not wired into the application.
+
+---
+
+## 3. Overall Project State
+
+| Area | eekeeper-qt C++/Qt | py-eekeeper Python/PySide6 |
 |---|---|---|
-| Langage | C++ | Python 3.11+ |
-| Toolkit UI | Qt Widgets, qmake, Qt5 cible | PySide6 / Qt6 |
-| Packaging | qmake, Flatpak KDE 5.15 | `pyproject.toml`, hatchling, script `py-eekeeper` |
-| Plateformes annoncées | Windows, Linux, macOS | Linux, macOS |
-| Tests automatisés | Aucun test trouvé | `pytest`, 43 tests dont 42 passent localement |
-| Architecture | Globals et singletons historiques | Modules `formats`, `resources`, `ui`, `app`, `config` |
-| UI | Nombreux dialogues `.ui`, certains stubs | UI plus compacte, plusieurs dialogues orphelins |
-| Moteur formats | Très complet pour l'époque | Déjà substantiel et plus testable |
-| Maturité fonctionnelle | Édition partielle, beaucoup de logique historique | Édition partielle, meilleure base de validation |
+| Language | C++ | Python 3.11+ |
+| UI toolkit | Qt Widgets, qmake, Qt5 target | PySide6 / Qt6 |
+| Packaging | qmake, KDE 5.15 Flatpak | `pyproject.toml`, hatchling, `py-eekeeper` script |
+| Announced platforms | Windows, Linux, macOS | Linux, macOS |
+| Automated tests | No tests found | `pytest`, 43 tests, 42 pass locally |
+| Architecture | Historical globals and singletons | `formats`, `resources`, `ui`, `app`, `config` modules |
+| UI | Many `.ui` dialogs, some stubs | More compact UI, several orphaned dialogs |
+| Format engine | Very complete for its time | Already substantial and more testable |
+| Functional maturity | Partial editing, much historical logic | Partial editing, better validation base |
 
 ---
 
-## 4. Arborescence et organisation
+## 4. Tree Layout and Organization
 
 ### 4.1 eekeeper-qt
 
-L'ancien projet est organisé autour de :
+The legacy project is organized around:
 
-- `EEKeeperQt.pro` : projet qmake principal ;
-- `EEKeeper/main.cpp` : point d'entrée ;
-- `EEKeeper/EEKeeperQt.cpp` et `EEKeeper/include/EEKeeperQt.h` : singleton applicatif, variables globales, chargement des ressources ;
-- `EEKeeper/Inf*.cpp` et `EEKeeper/include/Inf*.h` : parsers de formats Infinity Engine ;
-- `EEKeeper/ui/*.cpp`, `EEKeeper/ui/*.h` et `EEKeeper/ui/{linux,mac,win32}/*.ui` : widgets et fichiers UI par plateforme ;
-- `res/` et `eekeeper.qrc` : icônes embarquées ;
-- `res/lang/en_US/*.uld` et `KitLists/Kits.uld` : listes utilisateur au format Qt binaire.
+- `EEKeeperQt.pro`: main qmake project;
+- `EEKeeper/main.cpp`: entry point;
+- `EEKeeper/EEKeeperQt.cpp` and `EEKeeper/include/EEKeeperQt.h`: application singleton, global variables, resource loading;
+- `EEKeeper/Inf*.cpp` and `EEKeeper/include/Inf*.h`: Infinity Engine format parsers;
+- `EEKeeper/ui/*.cpp`, `EEKeeper/ui/*.h`, and `EEKeeper/ui/{linux,mac,win32}/*.ui`: widgets and platform-specific UI files;
+- `res/` and `eekeeper.qrc`: embedded icons;
+- `res/lang/en_US/*.uld` and `KitLists/Kits.uld`: user lists in Qt binary format.
 
-L'ancien Qt duplique les fichiers `.ui` pour Linux, macOS et Windows. Cela donne une certaine adaptation plateforme, mais augmente fortement le coût de maintenance.
+The old Qt application duplicates `.ui` files for Linux, macOS, and Windows. This provides some platform adaptation, but greatly increases maintenance cost.
 
 ### 4.2 py-eekeeper
 
-La version Python est organisée autour de :
+The Python version is organized around:
 
-- `py_eekeeper/main.py` : point d'entrée ;
-- `py_eekeeper/app.py` : singleton `EEKeeperApp` et orchestration ;
-- `py_eekeeper/config.py` : configuration via `QSettings` ;
-- `py_eekeeper/formats/` : parsers binaires ;
-- `py_eekeeper/resources/` : façade de ressources jeu ;
-- `py_eekeeper/ui/` : interface PySide6 ;
-- `tests/` : tests unitaires et intégration synthétique.
+- `py_eekeeper/main.py`: entry point;
+- `py_eekeeper/app.py`: `EEKeeperApp` singleton and orchestration;
+- `py_eekeeper/config.py`: configuration through `QSettings`;
+- `py_eekeeper/formats/`: binary parsers;
+- `py_eekeeper/resources/`: game resource facade;
+- `py_eekeeper/ui/`: PySide6 interface;
+- `tests/`: unit tests and synthetic integration tests.
 
-Cette organisation est plus nette que l'ancien Qt : les formats, les ressources et l'UI sont mieux séparés. En revanche, la spécification `SPEC.md` décrit encore des fichiers ou comportements qui ne sont pas tous présents dans le code actuel, par exemple `pal_image_list.py`, `spell_browser.py`, `item_browser.py` ou `data/kits.dat`.
+This organization is cleaner than the old Qt code: formats, resources, and UI are better separated. However, `SPEC.md` still describes files or behaviors that are not all present in the current code, such as `pal_image_list.py`, `spell_browser.py`, `item_browser.py`, or `data/kits.dat`.
 
 ---
 
-## 5. Build, installation et dépendances
+## 5. Build, Installation, and Dependencies
 
-### 5.1 Ancien Qt
+### 5.1 Legacy Qt
 
-`eekeeper-qt` utilise qmake via `EEKeeperQt.pro`. Il dépend de Qt Widgets et compile un exécutable `EEKeeperQt`. Les ressources graphiques sont embarquées avec `eekeeper.qrc`.
+`eekeeper-qt` uses qmake through `EEKeeperQt.pro`. It depends on Qt Widgets and builds an `EEKeeperQt` executable. Graphic resources are embedded with `eekeeper.qrc`.
 
-Il existe aussi un `flatpak.json` visant un runtime KDE/Qt 5.15. Cela donne une piste de distribution Linux, mais le projet ne contient pas de pipeline CI ni de tests associés.
+A `flatpak.json` also targets a KDE/Qt 5.15 runtime. This provides a Linux distribution path, but the project contains no CI pipeline and no associated tests.
 
 ### 5.2 Python
 
-`py-eekeeper` utilise `pyproject.toml` avec `hatchling`. Les dépendances runtime déclarées sont :
+`py-eekeeper` uses `pyproject.toml` with `hatchling`. The declared runtime dependencies are:
 
-- `PySide6>=6.5` ;
+- `PySide6>=6.5`;
 - `Pillow>=10.0`.
 
-Observation importante : `Pillow` est déclaré, mais l'implémentation actuelle du chargement BAM/icône passe surtout par `QImage`/`QPixmap`. Le rôle réel de Pillow semble donc faible ou obsolète dans l'état courant.
+Important observation: `Pillow` is declared, but the current BAM/icon loading implementation mostly uses `QImage`/`QPixmap`. Pillow therefore appears to have little real use, or may be obsolete in the current state.
 
-La commande exposée est :
+The exposed command is:
 
 ```bash
 py-eekeeper
@@ -96,727 +96,727 @@ py-eekeeper
 
 ---
 
-## 6. Configuration et persistance
+## 6. Configuration and Persistence
 
-### 6.1 Points communs
+### 6.1 Common Ground
 
-Les deux implémentations conservent l'idée d'une configuration persistante contenant :
+Both implementations keep the idea of persistent configuration containing:
 
-- le chemin d'installation du jeu ;
-- la langue ;
-- le chemin des documents / sauvegardes ;
-- des options d'éditeur comme les limites de sorts, l'écriture des sorts mémorisés, l'ignorance des versions de données.
+- the game installation path;
+- the language;
+- the documents / save games path;
+- editor options such as spell limits, memorized spell writing behavior, and whether data versions should be ignored.
 
-### 6.2 Différences
+### 6.2 Differences
 
-| Sujet | eekeeper-qt | py-eekeeper |
+| Topic | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Système de settings | `QSettings("EEKeeper", ...)` historique | `QSettings("EEKeeper", "py-eekeeper")` |
-| Chemin install | manuel, auto-détection stubbée | dialogue avec auto-détection Steam Linux/macOS |
-| Chemin documents | stocké dans les settings | stocké, avec defaults Linux/macOS |
-| Options spell limits | persistées mais peu ou pas appliquées | persistées mais non appliquées dans l'UI actuelle |
-| Overwrite CHR/CRE | persiste, peu ou pas branché | `allow_chr_overwrite` persiste mais non utilisé |
-| Grille UI | setting présent | setting présent mais non appliqué |
-| Ignore versions | utilisé dans les parsers | propagé aux parsers |
-| Réinitialisation à chaud | partielle | changement install demande un redémarrage |
+| Settings system | Historical `QSettings("EEKeeper", ...)` | `QSettings("EEKeeper", "py-eekeeper")` |
+| Install path | Manual, auto-detection stubbed | Dialog with Steam auto-detection on Linux/macOS |
+| Documents path | Stored in settings | Stored, with Linux/macOS defaults |
+| Spell limit options | Persisted but rarely or never applied | Persisted but not applied in the current UI |
+| CHR/CRE overwrite | Persisted, barely wired | `allow_chr_overwrite` persisted but unused |
+| UI grid | Setting present | Setting present but not applied |
+| Ignore versions | Used in parsers | Propagated to parsers |
+| Hot reinitialization | Partial | Installation changes require restart |
 
-La version Python améliore l'auto-détection d'installation par rapport à l'ancien Qt, surtout sur Linux/macOS. En revanche, plusieurs options héritées existent dans la configuration sans effet visible dans l'interface.
+The Python version improves install auto-detection compared with the old Qt version, especially on Linux/macOS. However, several inherited options exist in configuration without visible UI effect.
 
 ---
 
-## 7. Chargement des ressources jeu
+## 7. Game Resource Loading
 
 ### 7.1 eekeeper-qt
 
-Le chargement historique suit globalement cette séquence :
+The historical loading sequence is roughly:
 
-1. ouvrir `dialog.tlk` dans `lang/<lang>/dialog.tlk` ;
-2. lire `chitin.key` ;
-3. ouvrir les BIF référencés ;
-4. scanner `override/` ;
-5. charger les icônes de sorts via BAM ;
-6. lire des ressources IDS et 2DA ;
-7. construire les listes de classes, races, alignements, kits, proficiencies, sorts, etc. ;
-8. charger des listes `.uld` comme `Kits.uld` et `Affects.uld`.
+1. open `dialog.tlk` from `lang/<lang>/dialog.tlk`;
+2. read `chitin.key`;
+3. open referenced BIF files;
+4. scan `override/`;
+5. load spell icons from BAM files;
+6. read IDS and 2DA resources;
+7. build class, race, alignment, kit, proficiency, spell, and other lists;
+8. load `.uld` lists such as `Kits.uld` and `Affects.uld`.
 
-Le modèle C++ repose beaucoup sur des variables globales : `_infKey`, `_infTlk`, `_spellBitmaps`, `_vlClass`, `_vlRace`, `_vlKit`, `_vlAffects`, etc.
+The C++ model relies heavily on globals: `_infKey`, `_infTlk`, `_spellBitmaps`, `_vlClass`, `_vlRace`, `_vlKit`, `_vlAffects`, and others.
 
 ### 7.2 py-eekeeper
 
-La version Python centralise davantage dans :
+The Python version centralizes more behavior in:
 
-- `ResourceManager` pour `KEY -> BIF -> resource` ;
-- `EEKeeperApp` pour l'orchestration ;
-- `ValueList` pour les listes d'affichage ;
-- `SpellBitmaps` pour les icônes BAM.
+- `ResourceManager` for `KEY -> BIF -> resource`;
+- `EEKeeperApp` for orchestration;
+- `ValueList` for display lists;
+- `SpellBitmaps` for BAM icons.
 
-Le `ResourceManager` scanne `override/`, donne la priorité aux fichiers override, puis retombe sur les BIF. Il sait exposer une liste de ressources par type.
+`ResourceManager` scans `override/`, prioritizes override files, then falls back to BIF data. It can also expose a resource list by type.
 
-### 7.3 Différences constatées
+### 7.3 Observed Differences
 
-| Sujet | eekeeper-qt | py-eekeeper |
+| Topic | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Priorité `override/` | Oui | Oui |
-| KEY/BIF | Oui | Oui |
-| TLK | Oui | Oui |
-| IDS chiffrés XOR | Oui | Oui pour 2DA/IDS selon parser actuel |
-| 2DA | Oui | Oui |
-| BAM | Oui, images Qt | Oui, pixels/Qt pixmap |
-| Spell bitmaps | chargés et prévus UI | chargés mais peu ou pas utilisés dans l'UI |
-| Palettes personnage | `CPalImageList` | pas de `pal_image_list.py` observé |
-| `.uld` | format binaire Qt | remplacé par `ValueList` JSON/IDS/2DA selon cas |
-| `Affects.uld` | présent et éditable | pas de `vl_affects` chargé complètement dans l'UI |
+| `override/` priority | Yes | Yes |
+| KEY/BIF | Yes | Yes |
+| TLK | Yes | Yes |
+| XOR-encrypted IDS | Yes | Yes for 2DA/IDS depending on current parser path |
+| 2DA | Yes | Yes |
+| BAM | Yes, Qt images | Yes, pixels/Qt pixmap |
+| Spell bitmaps | Loaded and intended for UI | Loaded but barely or not used in UI |
+| Character palettes | `CPalImageList` | No observed `pal_image_list.py` |
+| `.uld` | Qt binary format | Replaced by `ValueList` JSON/IDS/2DA depending on case |
+| `Affects.uld` | Present and editable | No fully loaded `vl_affects` in UI |
 
-La version Python a un modèle de ressources plus propre, mais elle n'a pas encore branché toute la richesse visuelle et toutes les listes configurables de l'ancien Qt.
+The Python version has a cleaner resource model, but it has not yet wired all visual richness or configurable lists from the old Qt application.
 
 ---
 
-## 8. Formats binaires supportés
+## 8. Supported Binary Formats
 
-### 8.1 Vue d'ensemble
+### 8.1 Overview
 
-| Format | eekeeper-qt | py-eekeeper | Commentaire |
+| Format | eekeeper-qt | py-eekeeper | Comment |
 |---|---|---|---|
-| `chitin.key` / KEY | Lecture | Lecture | Parité fonctionnelle attendue |
-| `.bif` / BIF | Lecture | Lecture | Python gère aussi des cas de BAM compressé testés |
-| `BALDUR.GAM` | Lecture/écriture | Lecture/écriture | Format critique dans les deux |
-| `.cre` / CRE embarqué | Lecture/écriture | Lecture/écriture | Cœur de l'éditeur |
-| `.chr` | Lecture/écriture parser | Lecture/écriture | Python exporte ; import ne modifie pas encore le party |
-| `dialog.tlk` | Lecture | Lecture | Python cache paresseusement les strings |
-| `.2da` | Lecture | Lecture | Python teste parsing + XOR |
-| `.ids` | Lecture indirecte | Lecture via ressources/listes | Moins exposé explicitement |
-| `.bam` | Lecture/décodage | Lecture/décodage | Python teste le décodeur |
-| `.bmp` | Ressource/portraits | Ressource/portraits | Python gère portraits de save |
-| `.itm` | Lecture pour nom/affichage | Lecture pour nom/affichage | Pas de vrai browser Python |
-| `.spl` | Lecture pour nom/affichage | Lecture pour listes de sorts | Pas de vrai browser graphique dédié |
-| `.bcs`, `.bs` | Indexés/ressources | Scannés selon types | Pas d'édition |
+| `chitin.key` / KEY | Read | Read | Expected functional parity |
+| `.bif` / BIF | Read | Read | Python also handles tested compressed BAM cases |
+| `BALDUR.GAM` | Read/write | Read/write | Critical format in both |
+| embedded `.cre` / CRE | Read/write | Read/write | Editor core |
+| `.chr` | Read/write parser | Read/write | Python exports; import does not yet modify the party |
+| `dialog.tlk` | Read | Read | Python lazily caches strings |
+| `.2da` | Read | Read | Python tests parsing + XOR |
+| `.ids` | Indirect read | Read through resources/lists | Less explicitly exposed |
+| `.bam` | Read/decode | Read/decode | Python tests the decoder |
+| `.bmp` | Resource/portraits | Resource/portraits | Python handles save portraits |
+| `.itm` | Read for name/display | Read for name/display | No full Python browser |
+| `.spl` | Read for name/display | Read for spell lists | No dedicated graphical browser |
+| `.bcs`, `.bs` | Indexed/resources | Scanned depending on type | No editing |
 
 ### 8.2 GAME
 
-Les deux implémentations traitent `BALDUR.GAM` comme le fichier principal d'une sauvegarde :
+Both implementations treat `BALDUR.GAM` as the main save game file:
 
-- personnages in-party ;
-- personnages hors-party ;
-- or du groupe ;
-- réputation du groupe ;
-- variables globales ;
-- journal ;
-- données CRE embarquées.
+- in-party characters;
+- out-of-party characters;
+- party gold;
+- party reputation;
+- global variables;
+- journal;
+- embedded CRE data.
 
-Différences :
+Differences:
 
-- l'ancien Qt expose surtout les personnages du groupe dans l'UI ; les personnages hors-party sont lus mais peu ou pas manipulables ;
-- Python affiche une indication `[NPC]` pour les hors-party dans `SavedGameWidget`, mais l'édition complète hors-party reste à vérifier selon flux UI ;
-- Python préserve le journal et les blocs inconnus de façon binaire, sans éditeur ;
-- Python expose des API `party_gold`, `party_reputation`, `get_globals`, `set_globals`, mais l'UI ne donne pas encore un éditeur global.
+- the old Qt UI mainly exposes party characters; out-of-party characters are read but barely or not manipulated;
+- Python displays an `[NPC]` marker for out-of-party characters in `SavedGameWidget`, but full out-of-party editing still depends on the current UI flow and should be verified;
+- Python preserves the journal and unknown blocks as binary data, without an editor;
+- Python exposes `party_gold`, `party_reputation`, `get_globals`, and `set_globals`, but the UI does not yet provide a global editor.
 
 ### 8.3 CRE
 
-Le format CRE est le centre des deux applications.
+CRE is the central format in both applications.
 
-Fonctionnalités communes ou proches :
+Common or close features:
 
-- statistiques principales ;
-- HP, AC, THAC0, XP, or personnel ;
-- niveaux ;
-- race, classe, genre, alignement, kit ;
-- jets de sauvegarde ;
-- résistances ;
-- compétences voleur ;
-- couleurs ;
-- portraits ;
-- scripts ;
-- sorts connus ;
-- mémorisation ;
-- inventaire ;
-- proficiencies via affects pour BG2/EE ;
-- effets/affects au niveau modèle.
+- main attributes;
+- HP, AC, THAC0, XP, personal gold;
+- levels;
+- race, class, gender, alignment, kit;
+- saving throws;
+- resistances;
+- thief skills;
+- colors;
+- portraits;
+- scripts;
+- known spells;
+- memorization;
+- inventory;
+- proficiencies through affects for BG2/EE;
+- effects/affects at model level.
 
-Différences :
+Differences:
 
-| Sujet | eekeeper-qt | py-eekeeper |
+| Topic | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Nombre de slots inventaire | code historique aligné sur 38 slots utiles | constante actuelle `INF_NUM_ITEMSLOTS = 38` dans le code modifié |
-| Documentation slots | UI/spec mentionnent parfois 39 | README/SPEC Python mentionnent encore 39 par endroits |
-| Affects génériques | parser présent, onglet UI vide | modèle présent, pas d'éditeur UI générique |
-| Vitesse | bug observé dans Qt : mauvaise ligne lue | Python modèle `get_speed`/`set_speed`, pas exposé largement |
-| Proficiencies | via affects + tribbles dual-class | via affects + constantes Python |
-| Sorts mémorisés sans known spell | préservé dans Qt | mécanisme à surveiller/valider en Python |
-| Mort / HP | logique historique | Python force HP à 0 si flags de mort selon modèle |
+| Inventory slot count | Historical code aligned with 38 useful slots | Current code constant `INF_NUM_ITEMSLOTS = 38` in modified code |
+| Slot documentation | UI/spec sometimes mention 39 | Python README/SPEC still mention 39 in places |
+| Generic affects | Parser present, UI tab empty | Model present, no generic UI editor |
+| Speed | Observed Qt bug: wrong UI line read | Python has `get_speed`/`set_speed`, not widely exposed |
+| Proficiencies | Through affects + dual-class tribbles | Through affects + Python constants |
+| Memorized spells without known spell | Preserved in Qt | Mechanism should be watched/validated in Python |
+| Death / HP | Historical logic | Python forces HP to 0 when death flags are set, according to model |
 
-Le code Python semble avoir beaucoup progressé sur la fidélité binaire CRE, mais la surface UI reste plus limitée que le modèle.
+The Python code appears to have made strong progress on binary CRE fidelity, but the UI surface remains more limited than the model.
 
 ### 8.4 CHR
 
-| Sujet | eekeeper-qt | py-eekeeper |
+| Topic | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Parser `.CHR` | Oui | Oui |
-| Export | prévu / partiellement branché selon UI | Oui via `export_character` |
-| Import | objectif historique de remplacement/ajout | lit le `.CHR`, affiche un statut, ne modifie pas encore la sauvegarde |
-| Overwrite policy | settings présents | settings présents mais peu utilisés |
+| `.CHR` parser | Yes | Yes |
+| Export | Planned / partially wired depending on UI | Yes through `export_character` |
+| Import | Historical goal of replacement/addition | Reads `.CHR`, displays status, does not yet modify the save |
+| Overwrite policy | Settings present | Settings present but barely used |
 
-L'écart majeur est l'import Python : il parse le personnage, mais ne l'intègre pas encore au `GAM`.
+The major gap is Python import: it parses the character but does not yet integrate it into the `GAM`.
 
 ### 8.5 TLK
 
-Les deux versions lisent `dialog.tlk`.
+Both versions read `dialog.tlk`.
 
-Différences :
+Differences:
 
-- l'ancien Qt utilise le TLK pour afficher les noms et possède un `StringFinderDialog` ;
-- Python possède aussi un `StringFinderDialog`, limite les résultats et passe par `InfTlk.get_string` ;
-- Python tente UTF-8 puis latin-1, ce qui est plus confortable côté encodage que le C++ historique.
+- old Qt uses TLK for names and has a `StringFinderDialog`;
+- Python also has a `StringFinderDialog`, limits results, and uses `InfTlk.get_string`;
+- Python tries UTF-8 and then latin-1, which is more convenient for encoding than the historical C++ approach.
 
 ### 8.6 2DA / IDS
 
-Les deux versions utilisent les tables 2DA/IDS pour construire les listes de jeu.
+Both versions use 2DA/IDS tables to build game lists.
 
-Différences :
+Differences:
 
-- l'ancien Qt construit beaucoup de listes globales depuis `HATERACE`, `WEAPPROF`, `KITLIST`, `ALIGN`, `CLASS`, `RACE`, etc. ;
-- Python charge une partie importante des listes, mais `vl_racial_enemy` est instanciée sans chargement complet observé, et `vl_affects` n'est pas équivalente à `Affects.uld`.
+- old Qt builds many global lists from `HATERACE`, `WEAPPROF`, `KITLIST`, `ALIGN`, `CLASS`, `RACE`, and others;
+- Python loads a significant subset of lists, but `vl_racial_enemy` is instantiated without a fully observed load path, and `vl_affects` is not equivalent to `Affects.uld`.
 
-### 8.7 BAM / images
+### 8.7 BAM / Images
 
-Les deux versions savent décoder BAM.
+Both versions can decode BAM.
 
-Différences :
+Differences:
 
-- l'ancien Qt utilise les bitmaps de sorts et des mécanismes de palettes pour l'affichage ;
-- Python a `SpellBitmaps`, mais les icônes ne sont pas encore branchées dans les onglets de sorts ou d'inventaire ;
-- Python n'a pas de `PalImageList` observée alors que la spécification la mentionne.
-
----
-
-## 9. Interface utilisateur principale
-
-### 9.1 Fenêtre principale
-
-| Élément | eekeeper-qt | py-eekeeper |
-|---|---|---|
-| Menus File | Open Saved Game, Open Character, Open Creature, Save, Exit prévus | Open Save, Save, Export Character, Import Character, Quit |
-| Save As | présent via dialogue/flux historique | absent de la fenêtre principale |
-| View | item/spell/creature browsers dockables prévus | absent |
-| Tools | pas équivalent strict | String Finder |
-| Options / Settings | Installation Directory, listes, options diverses | Installation Directory |
-| Help | About/Readme/Website prévus mais incomplets | About |
-| Toolbar | Open/Save/Web/About prévus | pas de toolbar équivalente observée |
-| Layout | fenêtre + onglets + widgets historiques | splitter vertical + party bar + onglets |
-
-La version Python est plus simple et plus compacte. Elle privilégie les fonctions déjà branchées plutôt que de déclarer beaucoup d'actions non implémentées. En revanche, cela signifie que plusieurs fonctions historiques visibles dans l'ancien Qt n'existent pas encore dans la nouvelle UI.
-
-### 9.2 Ouverture de sauvegarde
-
-**eekeeper-qt** :
-
-- dialogue dédié ;
-- liste les saves ;
-- exclut Quick-Save / Auto-Save selon comportement observé ;
-- supporte single-player, multiplayer et Black Pits ;
-- affiche un aperçu `BALDUR.BMP` ;
-- évite l'ouverture duplicate.
-
-**py-eekeeper** :
-
-- dialogue dédié ;
-- liste `save` et `mpsave` ;
-- ouvre les répertoires contenant `BALDUR.GAM` ;
-- affiche les personnages dans `SavedGameWidget` ;
-- gère les portraits depuis les BMP de sauvegarde ;
-- ne semble pas encore couvrir Black Pits explicitement ;
-- l'exclusion Quick-Save / Auto-Save doit être vérifiée dans le flux Python actuel.
-
-### 9.3 Barre / sélection de personnages
-
-`eekeeper-qt` utilise un `SavedGameWidget` et crée un `CharacterSheetWidget` par membre in-party. Les NPC/hors-party sont lus mais peu exposés.
-
-`py-eekeeper` possède aussi un `SavedGameWidget`, affiche les personnages et peut indiquer `[NPC]` pour hors-party. La sélection alimente un ensemble fixe d'onglets : Character, Spells, Memorization, Proficiencies, Inventory.
+- old Qt uses spell bitmaps and palette mechanisms for display;
+- Python has `SpellBitmaps`, but icons are not yet wired into spell or inventory tabs;
+- Python has no observed `PalImageList`, even though the specification mentions it.
 
 ---
 
-## 10. Onglets d'édition personnage
+## 9. Main User Interface
 
-### 10.1 Onglet caractéristiques / fiche personnage
+### 9.1 Main Window
 
-| Champ | eekeeper-qt | py-eekeeper |
+| Element | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Attributs STR/DEX/CON/INT/WIS/CHA | Oui | Oui |
-| HP courant/base | Oui | Oui |
-| AC | Oui | Oui |
-| THAC0 | Oui | Oui |
-| XP | Oui | Oui |
-| Or personnel | Oui | Oui |
-| Niveaux | Oui | Oui |
-| Classe/race/genre/alignement | Oui | Oui |
-| Kit | Oui | Oui |
-| Ennemi racial | Oui | pas exposé clairement |
-| Enemy-Ally / General / Specific | Oui côté modèle/UI ancien | pas exposé clairement |
-| Vitesse | champ présent mais bug Qt | modèle Python, pas UI évidente |
-| Résistances | Oui | Oui |
-| Jets de sauvegarde | Oui | Oui |
-| Thief skills | Oui | Oui |
-| Couleurs | Oui | Oui |
-| Portraits | Oui | Oui |
-| Scripts | Oui | Oui |
-| AC détaillée par type | partielle | pas exposée complètement |
-| Morale/fatigue/intox/luck | présent dans CRE | pas exposé largement |
+| File menu | Open Saved Game, Open Character, Open Creature, Save, Exit planned | Open Save, Save, Export Character, Import Character, Quit |
+| Save As | Present through historical dialog/flow | Missing from the main window |
+| View | Dockable item/spell/creature browsers planned | Missing |
+| Tools | No strict equivalent | String Finder |
+| Options / Settings | Installation Directory, lists, various options | Installation Directory |
+| Help | About/Readme/Website planned but incomplete | About |
+| Toolbar | Open/Save/Web/About planned | No equivalent observed |
+| Layout | Window + tabs + historical widgets | Vertical splitter + party bar + tabs |
 
-La version Python couvre les champs les plus utiles pour une édition de personnage, mais pas toute la granularité du CRE.
+The Python version is simpler and more compact. It favors already wired features rather than declaring many unimplemented actions. However, this also means that several historical features visible in the old Qt UI do not yet exist in the new UI.
 
-### 10.2 Inventaire
+### 9.2 Opening Save Games
 
-**eekeeper-qt** :
+**eekeeper-qt**:
 
-- affiche les slots, noms, quantités, identification ;
-- l'inventaire est essentiellement en lecture seule dans l'UI historique observée ;
-- l'item browser existe comme widget stub / UI prévue, mais la logique est faible ou absente.
+- dedicated dialog;
+- lists save games;
+- excludes Quick-Save / Auto-Save according to observed behavior;
+- supports single-player, multiplayer, and Black Pits;
+- shows a `BALDUR.BMP` preview;
+- avoids duplicate openings.
 
-**py-eekeeper** :
+**py-eekeeper**:
 
-- affiche 38 lignes ;
-- permet `Set Item` via `QInputDialog.getItem` sur la liste des ITM ;
-- permet `Remove` ;
-- permet `Identify All` ;
-- n'affiche pas d'icônes d'items ;
-- ne fournit pas de vrai navigateur graphique avec filtres, catégories, descriptions ;
-- affiche les quantités mais ne donne pas une édition riche des charges/quantités.
+- dedicated dialog;
+- lists `save` and `mpsave`;
+- opens directories containing `BALDUR.GAM`;
+- displays characters in `SavedGameWidget`;
+- handles portraits from save BMP files;
+- does not seem to explicitly cover Black Pits yet;
+- Quick-Save / Auto-Save exclusion should be verified in the current Python flow.
 
-Python dépasse donc l'ancien Qt sur l'édition basique effective de l'inventaire, mais reste loin d'un item browser complet.
+### 9.3 Character Bar / Selection
 
-### 10.3 Sorts connus
+`eekeeper-qt` uses a `SavedGameWidget` and creates a `CharacterSheetWidget` for each in-party member. NPCs/out-of-party characters are read but barely exposed.
 
-**eekeeper-qt** :
+`py-eekeeper` also has a `SavedGameWidget`, displays characters, and can show an `[NPC]` marker for out-of-party characters. Selection feeds a fixed set of tabs: Character, Spells, Memorization, Proficiencies, Inventory.
 
-- onglets Innate/Wizard/Priest ;
-- affichage des sorts ;
-- quelques actions de mémorisation ;
-- ajout/retrait incomplet selon le code UI historique ;
-- spell browser prévu mais stubbé.
+---
 
-**py-eekeeper** :
+## 10. Character Editing Tabs
 
-- types Wizard/Priest/Innate ;
-- filtre par niveau ;
-- listes Known et Available ;
-- boutons Add, Add All, Remove, Remove All ;
-- noms récupérés via TLK/SPL ;
-- pas de browser graphique dédié ;
-- pas d'icônes BAM dans l'onglet.
+### 10.1 Characteristics / Character Sheet
 
-Python est plus utilisable sur l'ajout/retrait de sorts connus, mais n'a pas encore la richesse visuelle prévue.
+| Field | eekeeper-qt | py-eekeeper |
+|---|---|---|
+| STR/DEX/CON/INT/WIS/CHA attributes | Yes | Yes |
+| Current/base HP | Yes | Yes |
+| AC | Yes | Yes |
+| THAC0 | Yes | Yes |
+| XP | Yes | Yes |
+| Personal gold | Yes | Yes |
+| Levels | Yes | Yes |
+| Class/race/gender/alignment | Yes | Yes |
+| Kit | Yes | Yes |
+| Racial enemy | Yes | Not clearly exposed |
+| Enemy-Ally / General / Specific | Yes in old model/UI | Not clearly exposed |
+| Speed | Field present but Qt bug | Python model, no obvious UI |
+| Resistances | Yes | Yes |
+| Saving throws | Yes | Yes |
+| Thief skills | Yes | Yes |
+| Colors | Yes | Yes |
+| Portraits | Yes | Yes |
+| Scripts | Yes | Yes |
+| Detailed AC by type | Partial | Not fully exposed |
+| Morale/fatigue/intoxication/luck | Present in CRE | Not widely exposed |
 
-### 10.4 Mémorisation
+The Python version covers the most useful character editing fields, but not the full CRE granularity.
 
-**eekeeper-qt** :
+### 10.2 Inventory
 
-- édition des maximums mémorisables par type/niveau ;
-- boutons +/- ;
-- logique d'écriture avec option de remise à jour des sorts mémorisés.
+**eekeeper-qt**:
 
-**py-eekeeper** :
+- displays slots, names, quantities, identification;
+- inventory is essentially read-only in the observed historical UI;
+- the item browser exists as a stub widget / planned UI, but logic is weak or absent.
 
-- table Type / Level / Max memorizable ;
-- boutons +1, -1, Max +1, Max -1 ;
-- pas d'édition détaillée sort par sort des sorts mémorisés ;
-- option `mem_spells_on_save` présente côté modèle.
+**py-eekeeper**:
 
-Parité partielle. Les deux se concentrent surtout sur les slots de mémorisation.
+- displays 38 rows;
+- supports `Set Item` through `QInputDialog.getItem` over the ITM list;
+- supports `Remove`;
+- supports `Identify All`;
+- does not show item icons;
+- does not provide a full graphical browser with filters, categories, or descriptions;
+- displays quantities but does not provide rich charge/quantity editing.
+
+Python therefore surpasses old Qt for effective basic inventory editing, but remains far from a complete item browser.
+
+### 10.3 Known Spells
+
+**eekeeper-qt**:
+
+- Innate/Wizard/Priest tabs;
+- spell display;
+- some memorization actions;
+- incomplete add/remove behavior according to the historical UI code;
+- spell browser planned but stubbed.
+
+**py-eekeeper**:
+
+- Wizard/Priest/Innate types;
+- level filter;
+- Known and Available lists;
+- Add, Add All, Remove, Remove All buttons;
+- names retrieved through TLK/SPL;
+- no dedicated graphical browser;
+- no BAM icons in the tab.
+
+Python is more usable for adding/removing known spells, but does not yet have the planned visual richness.
+
+### 10.4 Memorization
+
+**eekeeper-qt**:
+
+- edits maximum memorization by type/level;
+- +/- buttons;
+- write logic with an option to refresh memorized spells.
+
+**py-eekeeper**:
+
+- Type / Level / Max memorizable table;
+- +1, -1, Max +1, Max -1 buttons;
+- no detailed per-spell editing of memorized spells;
+- `mem_spells_on_save` option present at model level.
+
+Parity is partial. Both focus mainly on memorization slots.
 
 ### 10.5 Proficiencies
 
-**eekeeper-qt** :
+**eekeeper-qt**:
 
-- liste `WEAPPROF` ;
-- édition 0-5 ;
-- gestion via affects pour BG2/EE ;
-- logique dual-class/tribbles historique.
+- `WEAPPROF` list;
+- 0-5 editing;
+- affect-based handling for BG2/EE;
+- historical dual-class/tribble logic.
 
-**py-eekeeper** :
+**py-eekeeper**:
 
-- table de 23 proficiencies ;
-- édition 0-5 ;
-- implémentation via affects ;
-- pas de filtrage par classe observé, contrairement à la spécification.
+- 23-proficiency table;
+- 0-5 editing;
+- affect-based implementation;
+- no observed class-based filtering, unlike the specification.
 
-Bonne parité de base. Python est probablement plus simple à tester, mais l'UI est moins contextuelle.
+Basic parity is good. Python is probably easier to test, but its UI is less contextual.
 
-### 10.6 Onglets absents ou incomplets
+### 10.6 Missing or Incomplete Tabs
 
-Dans `eekeeper-qt`, certains onglets ou zones existent mais sont vides ou peu branchés :
+In `eekeeper-qt`, some tabs or areas exist but are empty or barely wired:
 
-- Appearance ;
-- Affects ;
-- Global Variables ;
-- Local Variables ;
-- Journal Entries ;
-- navigateurs Item/Spell/Creature.
+- Appearance;
+- Affects;
+- Global Variables;
+- Local Variables;
+- Journal Entries;
+- Item/Spell/Creature browsers.
 
-Dans `py-eekeeper`, ces zones ne sont pas encore exposées comme onglets équivalents. Les données sont parfois préservées ou parsées, mais non éditables dans l'UI.
+In `py-eekeeper`, these areas are not yet exposed as equivalent tabs. Data is sometimes preserved or parsed, but not editable in the UI.
 
 ---
 
-## 11. Dialogues auxiliaires
+## 11. Auxiliary Dialogs
 
-| Dialogue | eekeeper-qt | py-eekeeper | Différence |
+| Dialog | eekeeper-qt | py-eekeeper | Difference |
 |---|---|---|---|
-| Installation Directory | Oui, validation Linux inachevée | Oui, auto-détection Steam | Python mieux abouti |
-| Open Saved Game | Oui | Oui | Qt couvre davantage de types de saves |
-| Save Game Name | Oui, utilisé pour save-as/rename | fichier présent mais non branché | Python incomplet |
-| ValueListDialog | Oui, branché pour Kits/Affects | fichier présent mais non branché | Python incomplet |
-| ValueItemDialog | Oui | pas observé comme dialogue équivalent autonome | Python incomplet |
-| StringFinderDialog | Oui | Oui | Python limite/structure les résultats |
-| SpellBrowserWidget | UI/stub | absent | Aucun browser complet |
-| ItemBrowserWidget | UI/stub | absent | Aucun browser complet |
-| About | prévu/incomplet | Oui simple | Python plus branché |
+| Installation Directory | Yes, incomplete Linux validation | Yes, Steam auto-detection | Python more complete |
+| Open Saved Game | Yes | Yes | Qt covers more save types |
+| Save Game Name | Yes, used for save-as/rename | File present but not wired | Python incomplete |
+| ValueListDialog | Yes, wired for Kits/Affects | File present but not wired | Python incomplete |
+| ValueItemDialog | Yes | No equivalent standalone dialog observed | Python incomplete |
+| StringFinderDialog | Yes | Yes | Python limits/structures results |
+| SpellBrowserWidget | UI/stub | Missing | No complete browser |
+| ItemBrowserWidget | UI/stub | Missing | No complete browser |
+| About | Planned/incomplete | Simple implementation | Python more wired |
 
 ---
 
-## 12. Fonctionnalités de sauvegarde
+## 12. Save Features
 
 ### 12.1 Save
 
-Les deux versions savent réécrire `BALDUR.GAM` en recalculant les offsets et en réinjectant les données CRE modifiées.
+Both versions can rewrite `BALDUR.GAM`, recalculate offsets, and reinject modified CRE data.
 
-### 12.2 Save As / renommage
+### 12.2 Save As / Rename
 
-`eekeeper-qt` contient un flux de sauvegarde sous nouveau nom :
+`eekeeper-qt` contains a save-as flow:
 
-- dialogue de nom ;
-- numérotation du dossier ;
-- copie des fichiers adjacents ;
-- écriture du nouveau `BALDUR.GAM`.
+- name dialog;
+- folder numbering;
+- adjacent file copy;
+- new `BALDUR.GAM` write.
 
-`py-eekeeper` ne propose actuellement que `File -> Save` dans la fenêtre principale. `save_game_name_dialog.py` existe mais n'est pas branché.
+`py-eekeeper` currently only exposes `File -> Save` in the main window. `save_game_name_dialog.py` exists but is not wired.
 
-### 12.3 Fermeture avec modifications
+### 12.3 Closing With Changes
 
-Les deux versions prévoient une vérification de modifications :
+Both versions include a change check:
 
-- ancien Qt : dialogue Save/Discard/Cancel à la fermeture d'un onglet modifié ;
-- Python : dialogue Yes/No/Cancel à la fermeture de l'application si `game.has_changed()`.
+- old Qt: Save/Discard/Cancel dialog when closing a modified tab;
+- Python: Yes/No/Cancel dialog when closing the application if `game.has_changed()`.
 
 ---
 
-## 13. Gestion des listes de valeurs
+## 13. Value List Management
 
-### 13.1 Ancien Qt
+### 13.1 Legacy Qt
 
-`eekeeper-qt` utilise des `CValueList` et des fichiers `.uld` au format binaire Qt `QDataStream`. Exemples :
+`eekeeper-qt` uses `CValueList` and `.uld` files in Qt `QDataStream` binary format. Examples:
 
-- `Kits.uld` ;
-- `Affects.uld` ;
-- `NumAttacks.uld` prévu.
+- `Kits.uld`;
+- `Affects.uld`;
+- planned `NumAttacks.uld`.
 
-Ces listes peuvent être éditées via les dialogues historiques, au moins pour Kits et Affects.
+These lists can be edited through historical dialogs, at least for Kits and Affects.
 
 ### 13.2 Python
 
-`py-eekeeper` utilise `ValueList` avec chargement depuis JSON ou formats type IDS/ressources. Les kits sont plutôt construits depuis `KITLIST.2da` et TLK. La spécification mentionne `data/kits.dat`, mais ce fichier n'a pas été observé dans le dépôt.
+`py-eekeeper` uses `ValueList`, loading from JSON or IDS/resource-like formats. Kits are mostly built from `KITLIST.2da` and TLK. The specification mentions `data/kits.dat`, but that file was not observed in the repository.
 
-### 13.3 Différence importante
+### 13.3 Important Difference
 
-La version Python ne cherche pas à reproduire le format `.uld` Qt. C'est une bonne simplification technique, mais cela signifie :
+The Python version does not try to reproduce the Qt `.uld` format. This is a useful technical simplification, but it means:
 
-- pas de compatibilité directe avec les `.uld` de l'ancien projet ;
-- pas d'éditeur d'affects/kits custom branché dans l'UI ;
-- une source de vérité davantage tirée des ressources jeu.
+- no direct compatibility with legacy `.uld` files;
+- no custom affects/kits editor wired in the UI;
+- the source of truth is more strongly derived from game resources.
 
 ---
 
-## 14. Plateformes et chemins
+## 14. Platforms and Paths
 
-| Sujet | eekeeper-qt | py-eekeeper |
+| Topic | eekeeper-qt | py-eekeeper |
 |---|---|---|
-| Windows | UI et validation `Baldur.exe` prévues | non annoncé dans README |
-| Linux | UI dédiée, validation install stubbée | Linux annoncé, auto-détection Steam |
-| macOS | UI dédiée, validation `.app/Contents/Resources` | macOS annoncé, auto-détection Steam |
-| Documents | settings et chemins manuels | defaults Linux/macOS |
-| Black Pits | dossier `bpsave/` prévu | pas clair / non exposé explicitement |
+| Windows | UI and `Baldur.exe` validation planned | Not announced in README |
+| Linux | Dedicated UI, stubbed install validation | Linux announced, Steam auto-detection |
+| macOS | Dedicated UI, `.app/Contents/Resources` validation | macOS announced, Steam auto-detection |
+| Documents | Settings and manual paths | Linux/macOS defaults |
+| Black Pits | `bpsave/` directory planned | Unclear / not explicitly exposed |
 | Multiplayer saves | `mpsave/` | `mpsave/` |
 
-Python simplifie la cible plateforme en abandonnant Windows pour l'instant. C'est cohérent avec le README, mais c'est une régression de couverture par rapport à l'ancien projet.
+Python simplifies the platform target by leaving Windows out for now. This is consistent with the README, but it is a coverage regression compared with the old project.
 
 ---
 
-## 15. Tests et validation
+## 15. Tests and Validation
 
 ### 15.1 eekeeper-qt
 
-Aucun test unitaire ou intégration automatisés n'a été trouvé. La validation semble essentiellement manuelle.
+No automated unit or integration tests were found. Validation appears to be mostly manual.
 
 ### 15.2 py-eekeeper
 
-La suite `pytest` contient des tests pour :
+The `pytest` suite contains tests for:
 
-- `InfCreature` ;
-- `InfGame` ;
-- `Inf2DA` ;
-- intégration open/edit/save synthétique ;
-- formats de ressources (`KEY`, `BIF`, `TLK`, `CHR`, `BAM`, `ResourceManager`) dans un fichier non suivi au moment de l'analyse.
+- `InfCreature`;
+- `InfGame`;
+- `Inf2DA`;
+- synthetic open/edit/save integration;
+- resource formats (`KEY`, `BIF`, `TLK`, `CHR`, `BAM`, `ResourceManager`) in a file that was untracked at the time of analysis.
 
-Exécution locale :
+Local execution:
 
 ```text
 42 passed, 1 failed
 ```
 
-L'échec observé est :
+The observed failure is:
 
 ```text
 tests/test_integration.py::test_ui_character_sheet_loading
 ModuleNotFoundError: No module named 'PySide6'
 ```
 
-Ce n'est pas un échec fonctionnel du code testé, mais un problème d'environnement : PySide6 n'est pas installé dans l'environnement d'exécution utilisé pour le test.
+This is not a functional failure of the tested code. It is an environment issue: PySide6 is not installed in the environment used for the test run.
 
-### 15.3 Différence majeure
+### 15.3 Major Difference
 
-La version Python est nettement supérieure sur la testabilité. Elle permet de sécuriser les parsers binaires par des blobs synthétiques et des round-trips. En revanche, il manque encore des tests sur de vraies sauvegardes et ressources de jeu, ce qui est critique pour garantir la parité avec l'ancien outil.
+The Python version is clearly stronger on testability. It can protect binary parsers with synthetic blobs and round-trips. However, it still lacks tests using real game saves and real game resources, which is critical for guaranteeing parity with the old tool.
 
 ---
 
-## 16. Documentation et spécification
+## 16. Documentation and Specification
 
 ### 16.1 eekeeper-qt
 
-Le projet contient :
+The project contains:
 
-- `AUTHORS` ;
-- `COPYING` ;
-- `TODO` ;
-- les licences Qt et Shadow Keeper ;
-- peu de documentation utilisateur moderne.
+- `AUTHORS`;
+- `COPYING`;
+- `TODO`;
+- Qt and Shadow Keeper licenses;
+- little modern user documentation.
 
-Le `TODO` historique mentionne notamment :
+The historical `TODO` notably mentions:
 
-- rendre les navigateurs Item/Spell fonctionnels ;
-- charger des CRE/CHR hors-party ;
-- changer le portrait ;
-- ajouter traductions, About, page web.
+- making Item/Spell browsers functional;
+- loading out-of-party CRE/CHR files;
+- changing portraits;
+- adding translations, About, and website support.
 
 ### 16.2 py-eekeeper
 
-Le dépôt contient :
+The repository contains:
 
-- `README.md` ;
-- `SPEC.md` ;
-- tests ;
-- packaging Python.
+- `README.md`;
+- `SPEC.md`;
+- tests;
+- Python packaging.
 
-### 16.3 Écarts entre README/SPEC et code Python
+### 16.3 Gaps Between README/SPEC and Python Code
 
-| Sujet documenté | État observé |
+| Documented topic | Observed state |
 |---|---|
-| `Full inventory editor (39 equipment slots)` | code actuel aligné plutôt 38 slots ; édition basique, pas full browser |
-| `Export/import characters` | export OK, import parse seulement et ne modifie pas le party |
-| `spell_browser.py` / `item_browser.py` | mentionnés dans `SPEC.md`, non présents |
-| `pal_image_list.py` | mentionné dans `SPEC.md`, non présent |
-| `data/kits.dat` | mentionné dans `SPEC.md`, non présent |
-| splash screen | mentionné dans `SPEC.md`, non observé |
-| `Save As` toolbar | mentionné dans `SPEC.md`, non branché |
-| affichage conditionnel proficiencies par classe | mentionné, non observé |
+| `Full inventory editor (39 equipment slots)` | Current code is closer to 38 slots; basic editing, no full browser |
+| `Export/import characters` | Export OK, import only parses and does not modify the party |
+| `spell_browser.py` / `item_browser.py` | Mentioned in `SPEC.md`, not present |
+| `pal_image_list.py` | Mentioned in `SPEC.md`, not present |
+| `data/kits.dat` | Mentioned in `SPEC.md`, not present |
+| splash screen | Mentioned in `SPEC.md`, not observed |
+| `Save As` toolbar | Mentioned in `SPEC.md`, not wired |
+| class-based proficiency filtering | Mentioned, not observed |
 
-La spécification reste utile comme cible, mais elle doit être traitée comme un document d'intention, pas comme une description exacte de l'état actuel.
+The specification remains useful as a target, but it should be treated as an intent document, not as an exact description of the current state.
 
 ---
 
-## 17. Différences fonctionnelles détaillées
+## 17. Detailed Functional Differences
 
-### 17.1 Fonctionnalités présentes dans les deux
+### 17.1 Features Present in Both
 
-- Ouverture d'une sauvegarde `BALDUR.GAM`.
-- Lecture des personnages embarqués.
-- Édition des attributs principaux.
-- Édition HP/AC/THAC0/XP/or/niveaux.
-- Édition jets de sauvegarde et résistances.
-- Édition des thief skills.
-- Édition des couleurs, portraits et scripts.
-- Gestion des sorts connus.
-- Gestion des slots de mémorisation.
-- Gestion des proficiencies.
-- Lecture/écriture de l'inventaire au niveau modèle.
-- Lecture de `dialog.tlk`.
-- Recherche de chaîne TLK.
-- Export `.CHR` au moins au niveau modèle/fonction.
-- Chargement de ressources via KEY/BIF.
-- Priorité aux ressources `override/`.
-- Décodage BAM.
+- Opening a `BALDUR.GAM` save.
+- Reading embedded characters.
+- Editing main attributes.
+- Editing HP/AC/THAC0/XP/gold/levels.
+- Editing saving throws and resistances.
+- Editing thief skills.
+- Editing colors, portraits, and scripts.
+- Managing known spells.
+- Managing memorization slots.
+- Managing proficiencies.
+- Reading/writing inventory at model level.
+- Reading `dialog.tlk`.
+- Searching TLK strings.
+- Exporting `.CHR` at least at model/function level.
+- Loading resources through KEY/BIF.
+- Prioritizing `override/` resources.
+- Decoding BAM.
 
-### 17.2 Fonctionnalités ou comportements Qt absents/incomplets en Python
+### 17.2 Qt Features or Behaviors Missing/Incomplete in Python
 
-- `Save As` avec création d'un nouveau dossier de sauvegarde.
-- Renommage complet de sauvegarde via `SaveGameNameDialog`.
-- Item browser graphique.
-- Spell browser graphique.
+- `Save As` with creation of a new save folder.
+- Full save rename through `SaveGameNameDialog`.
+- Graphical item browser.
+- Graphical spell browser.
 - Creature browser.
-- Éditeur de listes custom Kits/Affects.
-- Éditeur d'affects génériques.
-- Éditeur de variables globales.
-- Éditeur de variables locales.
-- Éditeur du journal.
-- Onglet Appearance équivalent à l'ancien UI.
-- Changement de portrait par navigateur.
-- Gestion Black Pits explicite.
-- Support Windows documenté.
-- Toolbar historique.
-- Menus View/Settings complets.
-- Application effective des limites de sorts connus/mémorisés.
-- Application de l'option grille.
-- Politique d'overwrite CHR/CRE complète.
-- Import `.CHR` dans le party ou remplacement d'un personnage.
-- Utilisation visible des icônes de sorts/items.
-- Palette images personnage.
+- Custom Kits/Affects list editor.
+- Generic affects editor.
+- Global variables editor.
+- Local variables editor.
+- Journal editor.
+- Appearance tab equivalent to the old UI.
+- Portrait change through a browser.
+- Explicit Black Pits handling.
+- Documented Windows support.
+- Historical toolbar.
+- Complete View/Settings menus.
+- Effective enforcement of known/memorized spell limits.
+- Grid option application.
+- Complete CHR/CRE overwrite policy.
+- `.CHR` import into the party or character replacement.
+- Visible spell/item icons.
+- Character palette images.
 
-### 17.3 Fonctionnalités Python plus avancées ou mieux structurées
+### 17.3 Python Features That Are More Advanced or Better Structured
 
-- Tests automatisés.
-- Architecture modulaire plus claire.
-- Parsers plus faciles à valider indépendamment de l'UI.
-- Auto-détection Steam Linux/macOS plus utile que le stub Qt.
-- Encoding TLK plus souple.
-- Gestion Python des ressources plus centralisée.
-- Édition effective basique de l'inventaire, alors que l'ancien Qt était principalement lecture seule côté UI.
-- Ajout/retrait de sorts connus plus directement utilisable.
-- Packaging Python standard.
+- Automated tests.
+- Clearer modular architecture.
+- Parsers that are easier to validate independently of the UI.
+- More useful Linux/macOS Steam auto-detection than the Qt stub.
+- More flexible TLK encoding behavior.
+- More centralized Python resource management.
+- Effective basic inventory editing, whereas old Qt was mostly read-only in the UI.
+- More directly usable known-spell add/remove flow.
+- Standard Python packaging.
 
-### 17.4 Bugs ou dettes de l'ancien Qt à ne pas reproduire
+### 17.4 Legacy Qt Bugs or Debt Not to Reproduce
 
-- Validation Linux du chemin d'installation inachevée.
-- `FindInstallPath()` stubbée.
-- Certains menus/actions déclarés sans implémentation.
-- Navigateurs Item/Spell présents mais sans logique réelle.
-- Inventaire affiché mais non édité en pratique.
-- Onglets Appearance/Affects/Globals/Journal vides.
-- Bug observé sur la vitesse : mauvaise ligne UI utilisée dans `SetSpeed()`.
-- Boucle de mise à jour des sorts potentiellement incorrecte.
-- Plusieurs settings persistants mais non appliqués.
-- Logging fichier prévu mais largement désactivé.
+- Incomplete Linux install path validation.
+- Stubbed `FindInstallPath()`.
+- Some declared menus/actions without implementation.
+- Item/Spell browsers present but without real logic.
+- Inventory displayed but not really editable.
+- Empty Appearance/Affects/Globals/Journal tabs.
+- Observed speed bug: wrong UI line used in `SetSpeed()`.
+- Potentially incorrect spell update loop.
+- Several persistent settings not applied.
+- File logging planned but mostly disabled.
 
 ---
 
-## 18. Différences techniques par module
+## 18. Technical Differences by Module
 
-### 18.1 Application core
+### 18.1 Application Core
 
-| eekeeper-qt | py-eekeeper | Différence |
+| eekeeper-qt | py-eekeeper | Difference |
 |---|---|---|
-| `EEKeeper` / variables globales | `EEKeeperApp` singleton | Python réduit les globals dispersés |
-| chargement ressources dans fenêtre/app | `ResourceManager` + app | meilleure séparation Python |
-| `QSettings` historique | `Config` | Python encapsule mieux |
-| log custom | peu de logging observé | logging Python à enrichir |
+| `EEKeeper` / global variables | `EEKeeperApp` singleton | Python reduces scattered globals |
+| resource loading in window/app | `ResourceManager` + app | better Python separation |
+| historical `QSettings` | `Config` | Python encapsulates better |
+| custom log | little observed logging | Python logging could be enriched |
 
 ### 18.2 Formats
 
-| eekeeper-qt | py-eekeeper | État Python |
+| eekeeper-qt | py-eekeeper | Python state |
 |---|---|---|
-| `CInfKey` | `InfKey` | proche |
-| `CInfBifFile` | `InfBifFile` | proche, tests présents |
-| `CInfGame` | `InfGame` | proche, tests présents |
-| `CInfCreature` | `InfCreature` | proche, beaucoup de logique récente |
-| `CInfChr` | `InfChr` | proche |
-| `CInfTlk` | `InfTlk` | proche |
-| `CInf2DA` | `Inf2DA` | proche |
-| `CInfBam` | `InfBam` | proche |
-| `CValueList` | `ValueList` | format différent |
-| `CSpellBitmaps` | `SpellBitmaps` | présent mais peu branché UI |
-| `CPalImageList` | absent | manquant |
+| `CInfKey` | `InfKey` | close |
+| `CInfBifFile` | `InfBifFile` | close, tests present |
+| `CInfGame` | `InfGame` | close, tests present |
+| `CInfCreature` | `InfCreature` | close, much recent logic |
+| `CInfChr` | `InfChr` | close |
+| `CInfTlk` | `InfTlk` | close |
+| `CInf2DA` | `Inf2DA` | close |
+| `CInfBam` | `InfBam` | close |
+| `CValueList` | `ValueList` | different format |
+| `CSpellBitmaps` | `SpellBitmaps` | present but barely wired to UI |
+| `CPalImageList` | missing | gap |
 
 ### 18.3 UI
 
-| eekeeper-qt | py-eekeeper | État Python |
+| eekeeper-qt | py-eekeeper | Python state |
 |---|---|---|
-| `EEKeeperWindow` | `MainWindow` | plus simple |
-| `SavedGameWidget` | `SavedGameWidget` | proche, NPC mieux signalés |
-| `CharacterSheetWidget` | `CharacterSheetWidget` | proche sur champs principaux |
-| `InventoryTab` | `InventoryTab` | Python plus éditable |
-| `SpellTab` | `SpellTab` | Python plus éditable |
-| `MemorizationTab` | `MemorizationTab` | proche |
-| `ProficienciesTab` | `ProficienciesTab` | proche |
-| `SpellBrowserWidget` | absent | manquant |
-| `ItemBrowserWidget` | absent | manquant |
-| `ValueListDialog` | présent mais orphelin | manquant côté menu |
-| `SaveGameNameDialog` | présent mais orphelin | manquant côté menu |
-| `InstallationDirectory` | `InstallationDialog` | Python plus pratique |
+| `EEKeeperWindow` | `MainWindow` | simpler |
+| `SavedGameWidget` | `SavedGameWidget` | close, NPCs better marked |
+| `CharacterSheetWidget` | `CharacterSheetWidget` | close for main fields |
+| `InventoryTab` | `InventoryTab` | Python more editable |
+| `SpellTab` | `SpellTab` | Python more editable |
+| `MemorizationTab` | `MemorizationTab` | close |
+| `ProficienciesTab` | `ProficienciesTab` | close |
+| `SpellBrowserWidget` | missing | gap |
+| `ItemBrowserWidget` | missing | gap |
+| `ValueListDialog` | present but orphaned | missing from menu |
+| `SaveGameNameDialog` | present but orphaned | missing from menu |
+| `InstallationDirectory` | `InstallationDialog` | Python more practical |
 
 ---
 
-## 19. Matrice de parité fonctionnelle
+## 19. Functional Parity Matrix
 
-| Fonctionnalité | Qt | Python | Verdict |
+| Feature | Qt | Python | Verdict |
 |---|---|---|---|
-| Ouvrir save | Oui | Oui | Parité |
-| Sauvegarder save | Oui | Oui | Parité |
-| Save As | Oui | Non | Python en retard |
-| Éditer stats principales | Oui | Oui | Parité |
-| Éditer sorts connus | Partiel | Oui | Python mieux branché |
-| Éditer mémorisation | Oui | Oui | Parité partielle |
-| Éditer proficiencies | Oui | Oui | Parité |
-| Éditer inventaire UI | Lecture seule | Basique | Python mieux |
-| Éditer affects génériques | Non UI | Non UI | Égalité basse |
-| Éditer globals/journal | Non UI | Non UI | Égalité basse |
-| Export CHR | Partiel | Oui | Python mieux |
-| Import CHR | Prévu | Parse seulement | Python incomplet |
-| String finder | Oui | Oui | Parité |
-| Item browser | Stub | Absent | Égalité basse |
-| Spell browser | Stub | Absent | Égalité basse |
-| Auto-detect install | Stub | Oui | Python mieux |
-| Tests auto | Non | Oui | Python mieux |
-| Windows | Oui | Non | Qt mieux |
-| Black Pits saves | Oui | Incertain | Qt mieux |
+| Open save | Yes | Yes | Parity |
+| Save game | Yes | Yes | Parity |
+| Save As | Yes | No | Python behind |
+| Edit main stats | Yes | Yes | Parity |
+| Edit known spells | Partial | Yes | Python better wired |
+| Edit memorization | Yes | Yes | Partial parity |
+| Edit proficiencies | Yes | Yes | Parity |
+| Edit inventory UI | Read-only | Basic | Python better |
+| Edit generic affects | No UI | No UI | Low parity |
+| Edit globals/journal | No UI | No UI | Low parity |
+| Export CHR | Partial | Yes | Python better |
+| Import CHR | Planned | Parse only | Python incomplete |
+| String finder | Yes | Yes | Parity |
+| Item browser | Stub | Missing | Low parity |
+| Spell browser | Stub | Missing | Low parity |
+| Auto-detect install | Stub | Yes | Python better |
+| Automated tests | No | Yes | Python better |
+| Windows | Yes | No | Qt better |
+| Black Pits saves | Yes | Unclear | Qt better |
 
 ---
 
-## 20. Risques de non-parité binaire
+## 20. Binary Non-Parity Risks
 
-Même si l'UI Python est déjà utilisable, les points suivants doivent être validés sur de vraies sauvegardes :
+Even though the Python UI is already usable, the following points must be validated on real save games:
 
-1. round-trip `BALDUR.GAM` sans altération du journal ;
-2. round-trip CRE avec affects, proficiencies dual-class et vitesse ;
-3. préservation des sorts mémorisés sans entrée known spell ;
-4. ordre d'écriture priest/wizard/innate ;
-5. comportement des items équipés et des quantités ;
-6. priorité `override/` sur les ressources moddées ;
-7. compatibilité BG:EE / BG2:EE / IWD:EE ;
-8. import/export `.CHR` réellement intégré au party.
+1. `BALDUR.GAM` round-trip without journal alteration;
+2. CRE round-trip with affects, dual-class proficiencies, and speed;
+3. preservation of memorized spells without known spell entries;
+4. priest/wizard/innate write order;
+5. equipped item and quantity behavior;
+6. `override/` priority for modded resources;
+7. BG:EE / BG2:EE / IWD:EE compatibility;
+8. `.CHR` import/export truly integrated into the party.
 
 ---
 
-## 21. Recommandations de convergence
+## 21. Convergence Recommendations
 
-Pour atteindre une parité utile avec `eekeeper-qt`, sans recopier ses dettes, l'ordre recommandé serait :
+To reach useful parity with `eekeeper-qt` without copying its technical debt, the recommended order is:
 
-1. **Brancher les dialogues déjà écrits** : `SaveGameNameDialog`, `ValueListDialog`.
-2. **Compléter l'import CHR** dans le `GAM`.
-3. **Ajouter un éditeur party/global** : or, réputation, globals.
-4. **Créer les navigateurs Item/Spell** avec icônes BAM.
-5. **Exposer les champs CRE avancés** : racial enemy, vitesse, flags, AC détaillée.
-6. **Valider sur sauvegardes réelles** et ajouter des tests d'intégration avec fixtures de jeu.
-7. **Corriger la documentation** (`README`, `SPEC`) pour refléter 38 slots, l'état réel des imports et l'absence de Windows.
+1. **Wire existing dialogs**: `SaveGameNameDialog`, `ValueListDialog`.
+2. **Complete CHR import** into the `GAM`.
+3. **Add a party/global editor**: gold, reputation, globals.
+4. **Create Item/Spell browsers** with BAM icons.
+5. **Expose advanced CRE fields**: racial enemy, speed, flags, detailed AC.
+6. **Validate on real save games** and add integration tests with game fixtures.
+7. **Fix documentation** (`README`, `SPEC`) to reflect 38 slots, the real import state, and the lack of Windows support.
 
 ---
 
 ## 22. Conclusion
 
-`py-eekeeper` n'est pas une simple traduction ligne à ligne de `eekeeper-qt`. C'est une réécriture plus moderne, plus testable et plus maintenable, qui a déjà repris l'essentiel du moteur de formats et une grande partie de l'édition de personnage.
+`py-eekeeper` is not a line-by-line translation of `eekeeper-qt`. It is a more modern, more testable, and more maintainable rewrite that has already recovered the core format engine and a large part of character editing.
 
-Par rapport à l'ancien Qt :
+Compared with old Qt:
 
-- **le moteur binaire est déjà proche ou supérieur sur la testabilité** ;
-- **l'UI de base est plus cohérente sur l'édition effective de sorts et d'inventaire** ;
-- **l'UI avancée, la gestion de sauvegarde étendue et plusieurs outils historiques manquent encore** ;
-- **la documentation Python surestime parfois l'état réel du code**.
+- **the binary engine is already close, and stronger on testability**;
+- **the basic UI is more coherent for effective spell and inventory editing**;
+- **advanced UI, extended save management, and several historical tools are still missing**;
+- **Python documentation sometimes overstates the real code state**.
 
-En pratique, `eekeeper-qt` reste une référence utile pour les comportements binaires subtils et les intentions historiques de l'éditeur, tandis que `py-eekeeper` est déjà un meilleur socle technique pour finir le produit, à condition de combler les écarts UI/flux listés dans ce rapport.
+In practice, `eekeeper-qt` remains a useful reference for subtle binary behaviors and historical editor intentions, while `py-eekeeper` is already a better technical foundation for finishing the product, provided the UI and workflow gaps listed in this report are closed.
 
 ---
 
-## 23. Sources analysées
+## 23. Sources Analyzed
 
-- `/tmp/eekeeper-qt` — commit `41b612e`
+- `/tmp/eekeeper-qt` - commit `41b612e`
 - `/home/grm/dev/py-eekeeper/py_eekeeper/`
 - `/home/grm/dev/py-eekeeper/tests/`
 - `/home/grm/dev/py-eekeeper/README.md`
 - `/home/grm/dev/py-eekeeper/SPEC.md`
 - `/home/grm/dev/py-eekeeper/pyproject.toml`
 
-Date du rapport : 5 juin 2026.
+Report date: June 5, 2026.
