@@ -13,6 +13,7 @@ from .constants import (
     hi_tribble, lo_tribble, make_tribble,
 )
 from .inf_affect import InfAffect, AFF_V2_SIZE
+from ..resources.kits import normalize_kit_value
 
 
 CRE_HEADER_SIZE = 724
@@ -103,6 +104,8 @@ class InfCreature:
             self._header_data.extend(b"\x00" * (CRE_HEADER_SIZE - len(self._header_data)))
 
         self._eff_version = self._header_data[0x33]
+        normalized_kit = normalize_kit_value(struct.unpack_from("<I", self._header_data, 0x244)[0])
+        struct.pack_into("<I", self._header_data, 0x244, normalized_kit)
 
         known_spells_offset = struct.unpack_from("<I", data, 0x2A0)[0]
         known_spells_count = struct.unpack_from("<I", data, 0x2A4)[0]

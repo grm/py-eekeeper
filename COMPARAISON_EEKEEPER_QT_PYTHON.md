@@ -430,12 +430,12 @@ Parity is partial. Both focus mainly on memorization slots.
 
 **py-eekeeper**:
 
-- 23-proficiency table;
+- proficiency list loaded from game `WEAPPROF.2DA`, with a common EE fallback;
 - 0-5 editing;
 - affect-based implementation;
 - no observed class-based filtering, unlike the specification.
 
-Basic parity is good. Python is probably easier to test, but its UI is less contextual.
+Basic parity is good. Python now follows the same game-resource source as `eekeeper-qt`, which avoids BG2/IWD:EE proficiency ID drift such as IWD:EE `2WEAPON = 114`.
 
 ### 10.6 Missing or Incomplete Tabs
 
@@ -523,7 +523,7 @@ These lists can be edited through historical dialogs, at least for Kits and Affe
 
 ### 13.2 Python
 
-`py-eekeeper` uses `ValueList`, loading from JSON or IDS/resource-like formats. Kits are mostly built from `KITLIST.2da` and TLK. The specification mentions `data/kits.dat`, but that file was not observed in the repository.
+`py-eekeeper` uses `ValueList`, loading from JSON or IDS/resource-like formats. Kits are mostly built from `KITLIST.2da` and TLK. Like legacy `Kits.uld` in `eekeeper-qt`, CRE kit values are stored shifted for both classic kits and mage schools (`CONJURER = 0x00800000`, `INVOKER = 0x08000000`, `BERSERKER = 0x40010000`). CRE loading normalizes briefly broken unshifted mage-school values such as `0x00000800` back to `0x08000000`. This is covered by `tests/test_app_kits.py` and `tests/test_inf_creature.py`. The specification mentions `data/kits.dat`, but that file was not observed in the repository.
 
 ### 13.3 Important Difference
 
@@ -806,7 +806,7 @@ Even though the Python UI is already usable, the following points must be valida
 4. priest/wizard/innate write order;
 5. equipped item and quantity behavior;
 6. `override/` priority for modded resources;
-7. BG:EE / BG2:EE / IWD:EE compatibility;
+7. BG:EE / BG2:EE / IWD:EE compatibility beyond game-provided proficiency IDs;
 8. `.CHR` import/export truly integrated into the party.
 
 ---

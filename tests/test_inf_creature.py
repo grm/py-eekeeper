@@ -70,6 +70,16 @@ def test_read_basic():
     assert cre.exp == 500000
 
 
+def test_read_normalizes_unshifted_mage_school_kit():
+    data = bytearray(_make_minimal_cre())
+    struct.pack_into("<I", data, 0x244, 0x00000800)
+
+    cre = InfCreature()
+
+    assert cre.read(bytes(data)) is True
+    assert cre.kit == 0x08000000
+
+
 def test_read_invalid():
     cre = InfCreature()
     assert cre.read(b"") is False

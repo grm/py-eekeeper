@@ -15,6 +15,8 @@ from .formats.constants import RESTYPE_SPL, RESTYPE_ITM, RESTYPE_2DA, RESTYPE_ID
 from .resources.resource_manager import ResourceManager
 from .resources.value_list import ValueList, ValueItem
 from .resources.spell_bitmaps import SpellBitmaps
+from .resources.kits import encode_kit_ids_value
+from .resources.proficiencies import load_weapprof_items
 
 
 logger = logging.getLogger(__name__)
@@ -147,9 +149,7 @@ class EEKeeperApp:
             return None
 
     def _encode_kit_ids_value(self, kit_id: int) -> int:
-        if kit_id < 0x10000:
-            return (kit_id << 16) & 0xFFFFFFFF
-        return kit_id & 0xFFFFFFFF
+        return encode_kit_ids_value(kit_id)
 
     def _load_spells(self):
         self.vl_spells.clear()
@@ -160,34 +160,41 @@ class EEKeeperApp:
 
     def _load_profs(self):
         self.vl_profs.clear()
-        from .formats.constants import PROF_LARGESWORDS, PROF_SWORDANDSHIELD
 
-        prof_names = [
-            (PROF_LARGESWORDS, "Large Swords"),
-            (PROF_LARGESWORDS + 1, "Small Swords"),
-            (PROF_LARGESWORDS + 2, "Bows"),
-            (PROF_LARGESWORDS + 3, "Spears"),
-            (PROF_LARGESWORDS + 4, "Blunt Weapons"),
-            (PROF_LARGESWORDS + 5, "Spiked Weapons"),
-            (PROF_LARGESWORDS + 6, "Axes"),
-            (PROF_LARGESWORDS + 7, "Missiles"),
-            (PROF_LARGESWORDS + 8, "Greatswords"),
-            (PROF_LARGESWORDS + 9, "Daggers"),
-            (PROF_LARGESWORDS + 10, "Halberds"),
-            (PROF_LARGESWORDS + 11, "Maces"),
-            (PROF_LARGESWORDS + 12, "Flails"),
-            (PROF_LARGESWORDS + 13, "Hammers"),
-            (PROF_LARGESWORDS + 14, "Clubs"),
-            (PROF_LARGESWORDS + 15, "Quarterstaffs"),
-            (PROF_LARGESWORDS + 16, "Crossbows"),
-            (PROF_LARGESWORDS + 17, "Longbows"),
-            (PROF_LARGESWORDS + 18, "Shortbows"),
-            (PROF_LARGESWORDS + 19, "Single Weapon Style"),
-            (PROF_LARGESWORDS + 20, "Two Weapon Style"),
-            (PROF_LARGESWORDS + 21, "Two-Handed Style"),
-            (PROF_LARGESWORDS + 22, "Sword and Shield Style"),
+        data = self.resource_manager.get_resource(RESTYPE_2DA, "WEAPPROF")
+        if data:
+            for item in load_weapprof_items(data, self.tlk.get_string):
+                self.vl_profs.add(item)
+            if self.vl_profs.count:
+                return
+
+        fallback_profs = [
+            (89, "Bastard Sword"),
+            (90, "Long Sword"),
+            (91, "Short Sword"),
+            (92, "Axe"),
+            (93, "Two-Handed Sword"),
+            (94, "Katana"),
+            (95, "Scimitar/Wakizashi/Ninja-To"),
+            (96, "Dagger"),
+            (97, "War Hammer"),
+            (98, "Spear"),
+            (99, "Halberd"),
+            (100, "Flail/Morning Star"),
+            (101, "Mace"),
+            (102, "Quarterstaff"),
+            (103, "Crossbow"),
+            (104, "Longbow"),
+            (105, "Shortbow"),
+            (106, "Dart"),
+            (107, "Sling"),
+            (111, "Two-Handed Weapon Style"),
+            (112, "Sword and Shield Style"),
+            (113, "Single Weapon Style"),
+            (114, "Two Weapon Style"),
+            (115, "Club"),
         ]
-        for prof_id, name in prof_names:
+        for prof_id, name in fallback_profs:
             self.vl_profs.add(ValueItem(index=prof_id, name=name))
 
     def get_spell_name(self, res_name: str) -> str:
