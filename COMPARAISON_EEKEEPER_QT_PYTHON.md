@@ -165,7 +165,7 @@ The Python version centralizes more behavior in:
 | Spell bitmaps | Loaded and intended for UI | Loaded but barely or not used in UI |
 | Character palettes | `CPalImageList` | No observed `pal_image_list.py` |
 | `.uld` | Qt binary format | Replaced by `ValueList` JSON/IDS/2DA depending on case |
-| `Affects.uld` | Present and editable | No fully loaded `vl_affects` in UI |
+| `Affects.uld` | Present and editable | Replaced by game-provided effect text when available |
 
 The Python version has a cleaner resource model, but it has not yet wired all visual richness or configurable lists from the old Qt application.
 
@@ -240,7 +240,7 @@ Differences:
 | Slot documentation | UI/spec sometimes mention 39 | Python README/SPEC still mention 39 in places |
 | Generic affects | Parser present, UI tab empty | Model present, full Affects tab with add/edit/remove (`ui/affects_tab.py`, `ui/affect_edit_dialog.py`) |
 | Speed | Observed Qt bug: wrong UI line read | Python has `get_speed`/`set_speed`, not widely exposed |
-| Proficiencies | Through affects + dual-class tribbles | Through affects + Python constants |
+| Proficiencies | Through affects + dual-class tribbles | Through affects + game `WEAPPROF.2DA` IDs |
 | Memorized spells without known spell | Preserved in Qt | Mechanism should be watched/validated in Python |
 | Death / HP | Historical logic | Python forces HP to 0 when death flags are set, according to model |
 
@@ -274,7 +274,7 @@ Both versions use 2DA/IDS tables to build game lists.
 Differences:
 
 - old Qt builds many global lists from `HATERACE`, `WEAPPROF`, `KITLIST`, `ALIGN`, `CLASS`, `RACE`, and others;
-- Python loads a significant subset of lists, but `vl_racial_enemy` is instantiated without a fully observed load path, and `vl_affects` is not equivalent to `Affects.uld`.
+- Python now loads the same core game lists from IDS/2DA resources, including `HATERACE.2DA`, `WEAPPROF.2DA`, `KITLIST.2DA`, `ALIGN.IDS`, `EA.IDS`, `STATE.IDS`, and `ANIMATE.IDS`. IDS parsing accepts hexadecimal values such as alignment ids (`0x11`, `0x22`, etc.). Effect opcode labels use game effect text resources such as `EFFTEXT.2DA` when available instead of the legacy user-editable `Affects.uld`.
 
 ### 8.7 BAM / Images
 
@@ -348,8 +348,8 @@ The Python version now covers most main window actions present in the legacy Qt 
 | Levels | Yes | Yes |
 | Class/race/gender/alignment | Yes | Yes |
 | Kit | Yes | Yes |
-| Racial enemy | Yes | Not clearly exposed |
-| Enemy-Ally / General / Specific | Yes in old model/UI | Not clearly exposed |
+| Racial enemy | Yes | Yes, loaded from `HATERACE.2DA` |
+| Enemy-Ally / General / Specific | Yes in old model/UI | Enemy-Ally exposed from `EA.IDS`; General/Specific remain model-only |
 | Speed | Field present but Qt bug | Python model, no obvious UI |
 | Resistances | Yes | Yes |
 | Saving throws | Yes | Yes |
@@ -516,7 +516,7 @@ Both versions include a change check:
 `eekeeper-qt` uses `CValueList` and `.uld` files in Qt `QDataStream` binary format. Examples:
 
 - `Kits.uld`;
-- `Affects.uld`;
+- `Affects.uld`, replaced by game-provided effect opcode labels when available;
 - planned `NumAttacks.uld`.
 
 These lists can be edited through historical dialogs, at least for Kits and Affects.
@@ -530,7 +530,7 @@ These lists can be edited through historical dialogs, at least for Kits and Affe
 The Python version does not try to reproduce the Qt `.uld` format. This is a useful technical simplification, but it means:
 
 - no direct compatibility with legacy `.uld` files;
-- no custom affects/kits editor wired in the UI;
+- no custom affects/kits value-list editor wired in the UI;
 - the source of truth is more strongly derived from game resources.
 
 ---
@@ -819,7 +819,7 @@ Most historical recommendations have been implemented. Remaining priorities:
 2. ~~Complete CHR import into the GAM~~ → Done.
 3. ~~Add a party/global editor~~ → Done (Game tab, globals editor, journal editor).
 4. ~~Create Item/Spell browsers with BAM icons~~ → Done.
-5. **Expose advanced CRE fields**: racial enemy, speed, flags, detailed AC, morale/fatigue/intoxication/luck.
+5. **Expose remaining advanced CRE fields**: speed, detailed AC, morale/fatigue/intoxication/luck.
 6. **Add a creature browser** and **local variables editor**.
 7. **Wire `ValueListDialog`** from the UI (currently still orphaned).
 8. **Validate on real save games** and add integration tests with game fixtures.

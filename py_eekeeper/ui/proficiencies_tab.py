@@ -8,7 +8,6 @@ from PySide6.QtCore import Qt
 
 from ..formats.inf_creature import InfCreature, ProfData
 from ..app import EEKeeperApp
-from ..formats.constants import PROF_LARGESWORDS, PROF_SWORDANDSHIELD
 
 
 class SpinDelegate(QStyledItemDelegate):

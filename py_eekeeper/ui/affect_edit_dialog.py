@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..formats.inf_affect import InfAffect
+from ..app import EEKeeperApp
 
 
 class AffectEditDialog(QDialog):
@@ -27,6 +28,9 @@ class AffectEditDialog(QDialog):
         grid = QGridLayout(main_group)
 
         self._spin_opcode = self._add_spin(grid, "Opcode:", 0, 0, 0, 0xFFFF)
+        self._label_opcode_name = QLabel("")
+        grid.addWidget(QLabel("Opcode Name:"), 0, 2)
+        grid.addWidget(self._label_opcode_name, 0, 3)
         self._spin_target = self._add_spin(grid, "Target Type:", 1, 0, 0, 0xFFFFFFFF)
         self._spin_power = self._add_spin(grid, "Power:", 2, 0, 0, 255)
         self._spin_param1 = self._add_spin(grid, "Parameter 1:", 3, 0, -2147483648, 2147483647)
@@ -75,6 +79,7 @@ class AffectEditDialog(QDialog):
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._spin_opcode.valueChanged.connect(self._update_opcode_name)
 
     def _add_spin(self, grid, label: str, row: int, col: int,
                   min_val: int, max_val: int) -> QSpinBox:
@@ -86,6 +91,7 @@ class AffectEditDialog(QDialog):
 
     def _load_data(self):
         self._spin_opcode.setValue(self._affect.opcode)
+        self._update_opcode_name(self._affect.opcode)
         self._spin_target.setValue(self._affect.target_type)
         self._spin_power.setValue(self._affect.power)
         self._spin_param1.setValue(self._affect.parameter1)
@@ -125,3 +131,7 @@ class AffectEditDialog(QDialog):
 
     def get_affect(self) -> InfAffect:
         return self._affect
+
+    def _update_opcode_name(self, opcode: int):
+        item = EEKeeperApp.instance().vl_affects.find_by_index(opcode)
+        self._label_opcode_name.setText(item.name if item else "")

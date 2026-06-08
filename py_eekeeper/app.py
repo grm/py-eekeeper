@@ -17,6 +17,7 @@ from .resources.value_list import ValueList, ValueItem
 from .resources.spell_bitmaps import SpellBitmaps
 from .resources.kits import encode_kit_ids_value
 from .resources.proficiencies import load_weapprof_items
+from .resources.game_lists import load_effect_text_items, load_haterace_items
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class EEKeeperApp:
         self.vl_spells = ValueList("Spells")
         self.vl_animations = ValueList("Animations")
         self.vl_profs = ValueList("Proficiencies")
+        self.vl_affects = ValueList("Affects")
 
         self._initialized = False
         self._save_path: str = ""
@@ -88,18 +90,30 @@ class EEKeeperApp:
         self._load_ids_value_list(self.vl_class, "CLASS")
         self._load_ids_value_list(self.vl_race, "RACE")
         self._load_ids_value_list(self.vl_gender, "GENDER")
-        self._load_ids_value_list(self.vl_alignment, "ALIGNMEN")
+        self._load_ids_value_list(self.vl_alignment, "ALIGN", "ALIGNMEN")
         self._load_ids_value_list(self.vl_enemy_ally, "EA")
         self._load_ids_value_list(self.vl_state, "STATE")
         self._load_ids_value_list(self.vl_animations, "ANIMATE")
+        self._load_racial_enemies()
         self._load_kits()
         self._load_spells()
         self._load_profs()
+        self._load_affects()
 
-    def _load_ids_value_list(self, vl: ValueList, ids_name: str):
-        data = self.resource_manager.get_resource(RESTYPE_IDS, ids_name)
-        if data:
-            vl.load_from_ids(data.decode("latin-1", errors="replace"))
+    def _load_ids_value_list(self, vl: ValueList, *ids_names: str) -> bool:
+        for ids_name in ids_names:
+            data = self.resource_manager.get_resource(RESTYPE_IDS, ids_name)
+            if data and vl.load_from_ids(data.decode("latin-1", errors="replace")):
+                return True
+        return False
+
+    def _load_racial_enemies(self):
+        self.vl_racial_enemy.clear()
+        data = self.resource_manager.get_resource(RESTYPE_2DA, "HATERACE")
+        if not data:
+            return
+        for item in load_haterace_items(data, self.tlk.get_string):
+            self.vl_racial_enemy.add(item)
 
     def _load_kits(self):
         self.vl_kit.clear()
@@ -196,6 +210,17 @@ class EEKeeperApp:
         ]
         for prof_id, name in fallback_profs:
             self.vl_profs.add(ValueItem(index=prof_id, name=name))
+
+    def _load_affects(self):
+        self.vl_affects.clear()
+        for resource_name in ("EFFTEXT", "EFFECTS"):
+            data = self.resource_manager.get_resource(RESTYPE_2DA, resource_name)
+            if not data:
+                continue
+            for item in load_effect_text_items(data, self.tlk.get_string):
+                self.vl_affects.add(item)
+            if self.vl_affects.count:
+                return
 
     def get_spell_name(self, res_name: str) -> str:
         data = self.resource_manager.get_resource(RESTYPE_SPL, res_name)

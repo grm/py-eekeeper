@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 
 from ..formats.inf_creature import InfCreature
 from ..formats.inf_affect import InfAffect
+from ..app import EEKeeperApp
 
 
 class AffectsTab(QWidget):
@@ -23,9 +24,9 @@ class AffectsTab(QWidget):
         layout = QVBoxLayout(self)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(7)
+        self._table.setColumnCount(8)
         self._table.setHorizontalHeaderLabels([
-            "Opcode", "Target", "Param1", "Param2",
+            "Opcode", "Effect", "Target", "Param1", "Param2",
             "Timing", "Duration", "Resource",
         ])
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -61,12 +62,18 @@ class AffectsTab(QWidget):
         self._table.setRowCount(len(self._affects))
         for row, aff in enumerate(self._affects):
             self._table.setItem(row, 0, QTableWidgetItem(str(aff.opcode)))
-            self._table.setItem(row, 1, QTableWidgetItem(str(aff.target_type)))
-            self._table.setItem(row, 2, QTableWidgetItem(str(aff.parameter1)))
-            self._table.setItem(row, 3, QTableWidgetItem(str(aff.parameter2)))
-            self._table.setItem(row, 4, QTableWidgetItem(str(aff.timing_mode)))
-            self._table.setItem(row, 5, QTableWidgetItem(str(aff.duration)))
-            self._table.setItem(row, 6, QTableWidgetItem(aff.resource or aff.resource3))
+            self._table.setItem(row, 1, QTableWidgetItem(self._effect_name(aff.opcode)))
+            self._table.setItem(row, 2, QTableWidgetItem(str(aff.target_type)))
+            self._table.setItem(row, 3, QTableWidgetItem(str(aff.parameter1)))
+            self._table.setItem(row, 4, QTableWidgetItem(str(aff.parameter2)))
+            self._table.setItem(row, 5, QTableWidgetItem(str(aff.timing_mode)))
+            self._table.setItem(row, 6, QTableWidgetItem(str(aff.duration)))
+            self._table.setItem(row, 7, QTableWidgetItem(aff.resource or aff.resource3))
+
+    @staticmethod
+    def _effect_name(opcode: int) -> str:
+        item = EEKeeperApp.instance().vl_affects.find_by_index(opcode)
+        return item.name if item else ""
 
     def _on_add(self):
         if not self._creature:

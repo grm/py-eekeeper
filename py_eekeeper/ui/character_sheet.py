@@ -127,6 +127,11 @@ class CharacterSheetWidget(QWidget):
         self._combo_gender = QComboBox()
         self._combo_alignment = QComboBox()
         self._combo_kit = QComboBox()
+        self._combo_enemy_ally = QComboBox()
+        self._combo_racial_enemy = QComboBox()
+        self._combo_animation = QComboBox()
+        self._edit_state_flags = QLineEdit()
+        self._label_state_names = QLabel("")
 
         for vl, combo in [
             (app.vl_class, self._combo_class),
@@ -134,9 +139,13 @@ class CharacterSheetWidget(QWidget):
             (app.vl_gender, self._combo_gender),
             (app.vl_alignment, self._combo_alignment),
             (app.vl_kit, self._combo_kit),
+            (app.vl_enemy_ally, self._combo_enemy_ally),
+            (app.vl_racial_enemy, self._combo_racial_enemy),
+            (app.vl_animations, self._combo_animation),
         ]:
-            for item in vl.get_items():
-                combo.addItem(item.name, item.index)
+            self._fill_combo(combo, vl.get_items())
+
+        self._edit_state_flags.setPlaceholderText("0x0")
 
         fields = [
             ("Level 1:", self._spin_level1), ("Level 2:", self._spin_level2),
@@ -150,16 +159,28 @@ class CharacterSheetWidget(QWidget):
             ("Class:", self._combo_class), ("Race:", self._combo_race),
             ("Gender:", self._combo_gender), ("Alignment:", self._combo_alignment),
             ("Kit:", self._combo_kit),
+            ("Enemy/Ally:", self._combo_enemy_ally),
+            ("Racial Enemy:", self._combo_racial_enemy),
+            ("Animation:", self._combo_animation),
         ]
         for i, (label, combo) in enumerate(combos, start=len(fields)):
             layout.addWidget(QLabel(label), i, 0)
             layout.addWidget(combo, i, 1)
 
+        state_row = len(fields) + len(combos)
+        layout.addWidget(QLabel("State Flags:"), state_row, 0)
+        layout.addWidget(self._edit_state_flags, state_row, 1)
+        layout.addWidget(QLabel("Active States:"), state_row + 1, 0)
+        layout.addWidget(self._label_state_names, state_row + 1, 1)
+
         for spin in [self._spin_level1, self._spin_level2, self._spin_level3]:
             spin.valueChanged.connect(self._on_info_changed)
         for combo in [self._combo_class, self._combo_race, self._combo_gender,
-                      self._combo_alignment, self._combo_kit]:
+                      self._combo_alignment, self._combo_kit,
+                      self._combo_enemy_ally, self._combo_racial_enemy,
+                      self._combo_animation]:
             combo.currentIndexChanged.connect(self._on_info_changed)
+        self._edit_state_flags.textChanged.connect(self._on_state_flags_changed)
 
         return group
 
@@ -359,6 +380,11 @@ class CharacterSheetWidget(QWidget):
         self._set_combo_value(self._combo_gender, creature.gender)
         self._set_combo_value(self._combo_alignment, creature.alignment)
         self._set_combo_value(self._combo_kit, creature.kit)
+        self._set_combo_value(self._combo_enemy_ally, creature.enemy_ally)
+        self._set_combo_value(self._combo_racial_enemy, creature.racial_enemy)
+        self._set_combo_value(self._combo_animation, creature.animation_id)
+        self._edit_state_flags.setText(f"0x{creature.state_flags:X}")
+        self._label_state_names.setText(self._describe_state_flags(creature.state_flags))
 
         # Saves
         self._spin_save_death.setValue(creature.save_death)
@@ -414,7 +440,22 @@ class CharacterSheetWidget(QWidget):
             if combo.itemData(i) == value:
                 combo.setCurrentIndex(i)
                 return
-        combo.setCurrentIndex(0)
+        combo.addItem(f"Unknown ({value})", value)
+        combo.setCurrentIndex(combo.count() - 1)
+
+    @staticmethod
+    def _fill_combo(combo: QComboBox, items):
+        for item in items:
+            combo.addItem(item.name, item.index)
+
+    def _describe_state_flags(self, state_flags: int) -> str:
+        app = EEKeeperApp.instance()
+        names = [
+            item.name
+            for item in app.vl_state.get_items()
+            if item.index and (state_flags & item.index) == item.index
+        ]
+        return ", ".join(names) if names else "None"
 
     # --- Undo helper ---
 
@@ -468,6 +509,19 @@ class CharacterSheetWidget(QWidget):
         self._push_change("gender", self._combo_gender.currentData() or 0)
         self._push_change("alignment", self._combo_alignment.currentData() or 0)
         self._push_change("kit", self._combo_kit.currentData() or 0)
+        self._push_change("enemy_ally", self._combo_enemy_ally.currentData() or 0)
+        self._push_change("racial_enemy", self._combo_racial_enemy.currentData() or 0)
+        self._push_change("animation_id", self._combo_animation.currentData() or 0)
+
+    def _on_state_flags_changed(self):
+        if self._loading or not self._creature:
+            return
+        try:
+            value = int(self._edit_state_flags.text().strip() or "0", 0)
+        except ValueError:
+            return
+        self._push_change("state_flags", value)
+        self._label_state_names.setText(self._describe_state_flags(value))
 
     def _on_saves_changed(self):
         if self._loading or not self._creature:

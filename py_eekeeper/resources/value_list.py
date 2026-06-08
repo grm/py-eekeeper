@@ -53,7 +53,7 @@ class ValueList:
             parts = line.split(None, 1)
             if len(parts) >= 2:
                 try:
-                    index = int(parts[0])
+                    index = int(parts[0], 0)
                     name = parts[1]
                     self._items.append(ValueItem(index=index, name=name))
                 except ValueError:
