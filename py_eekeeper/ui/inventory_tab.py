@@ -3,10 +3,10 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton,
-    QHeaderView, QAbstractItemView,
+    QHeaderView, QAbstractItemView, QMessageBox,
 )
-from PySide6.QtCore import Qt, QMimeData
-from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
+from PySide6.QtCore import Qt, QMimeData, QSize
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon
 
 from ..formats.inf_creature import InfCreature, CreItem
 from ..formats.constants import INF_NUM_ITEMSLOTS
@@ -96,15 +96,31 @@ class InventoryTab(QWidget):
         layout = QVBoxLayout(self)
 
         self._table = _DragDropInventoryTable()
-        self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["Slot", "Item", "Qty", "ID'd"])
+        self._table.setColumnCount(12)
+        self._table.setHorizontalHeaderLabels([
+            "Icon", "Slot", "Type", "Resource", "Item", "Qty", "ID'd",
+            "Stack", "Value", "Weight", "Lore", "Ench",
+        ])
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self._table.setColumnWidth(0, 120)
-        self._table.setColumnWidth(2, 50)
-        self._table.setColumnWidth(3, 50)
+        self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        for column in range(5, 12):
+            self._table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        self._table.setIconSize(QSize(48, 48))
+        self._table.verticalHeader().setDefaultSectionSize(54)
+        self._table.setColumnWidth(0, 56)
+        self._table.setColumnWidth(1, 120)
+        self._table.setColumnWidth(2, 105)
+        self._table.setColumnWidth(3, 80)
+        self._table.setColumnWidth(5, 75)
+        self._table.setColumnWidth(6, 45)
+        self._table.setColumnWidth(7, 50)
+        self._table.setColumnWidth(8, 60)
+        self._table.setColumnWidth(9, 55)
+        self._table.setColumnWidth(10, 45)
+        self._table.setColumnWidth(11, 45)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         layout.addWidget(self._table)
@@ -128,6 +144,28 @@ class InventoryTab(QWidget):
     def load_creature(self, creature: InfCreature):
         self._creature = creature
         self._refresh_table()
+        self._warn_unknown_items()
+
+    def _warn_unknown_items(self):
+        if not self._creature:
+            return
+
+        app = EEKeeperApp.instance()
+        unknown = sorted({
+            item.res_name
+            for item in self._creature.get_items()
+            if item.res_name and not app.has_item(item.res_name)
+        })
+        if not unknown:
+            return
+
+        QMessageBox.warning(
+            self,
+            "Unknown items",
+            "Some items assigned to this character were not found in the game "
+            "database. If you save this character, those items may not work "
+            "correctly in-game.\n\nCannot find: " + ", ".join(unknown),
+        )
 
     def _refresh_table(self):
         self._table.setRowCount(0)
@@ -142,29 +180,107 @@ class InventoryTab(QWidget):
             slot_name = SLOT_NAMES[i] if i < len(SLOT_NAMES) else f"Slot {i}"
             slot_item = QTableWidgetItem(slot_name)
             slot_item.setFlags(slot_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self._table.setItem(i, 0, slot_item)
+            self._table.setItem(i, 1, slot_item)
 
             item = items[i] if i < len(items) else CreItem()
+            info = app.get_item_info(item.res_name) if item.res_name else None
             if item.res_name:
-                friendly = app.get_item_name(item.res_name)
+                friendly = info.display_name if info else app.get_item_name(item.res_name)
                 name_text = f"{item.res_name} - {friendly}"
+                if not info:
+                    name_text += " (unknown)"
             else:
                 name_text = "(empty)"
 
+            tooltip = self._build_item_tooltip(item, info)
+
+            icon_item = QTableWidgetItem()
+            icon_item.setFlags(icon_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if item.res_name and app.spell_bitmaps:
+                icon = app.spell_bitmaps.get_item_icon(item.res_name)
+                if icon:
+                    icon_item.setIcon(QIcon(icon))
+            if tooltip:
+                icon_item.setToolTip(tooltip)
+            self._table.setItem(i, 0, icon_item)
+
+            type_item = QTableWidgetItem(info.type_name if info else "")
+            type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if tooltip:
+                type_item.setToolTip(tooltip)
+            self._table.setItem(i, 2, type_item)
+
+            resource_item = QTableWidgetItem(item.res_name if item.res_name else "")
+            resource_item.setFlags(resource_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if tooltip:
+                resource_item.setToolTip(tooltip)
+            self._table.setItem(i, 3, resource_item)
+
             name_item = QTableWidgetItem(name_text)
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if item.res_name:
+            if tooltip:
+                name_item.setToolTip(tooltip)
+            elif item.res_name:
                 desc = get_item_description(item.res_name)
                 if desc:
                     name_item.setToolTip(desc)
-            self._table.setItem(i, 1, name_item)
+            self._table.setItem(i, 4, name_item)
 
-            qty_item = QTableWidgetItem(str(item.quantity1) if item.res_name else "")
-            self._table.setItem(i, 2, qty_item)
+            if item.res_name:
+                qty_text = f"{item.quantity1}/{item.quantity2}/{item.quantity3}"
+            else:
+                qty_text = ""
+            qty_item = QTableWidgetItem(qty_text)
+            self._table.setItem(i, 5, qty_item)
 
             id_item = QTableWidgetItem("Yes" if item.identified else "No" if item.res_name else "")
             id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self._table.setItem(i, 3, id_item)
+            self._table.setItem(i, 6, id_item)
+
+            values = [
+                info.max_stackable if info else None,
+                info.base_value if info else None,
+                info.weight if info else None,
+                info.lore if info else None,
+                info.enchantment if info else None,
+            ]
+            for offset, value in enumerate(values, start=7):
+                value_item = QTableWidgetItem("" if value is None else str(value))
+                value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                value_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if tooltip:
+                    value_item.setToolTip(tooltip)
+                self._table.setItem(i, offset, value_item)
+
+    def _build_item_tooltip(self, item: CreItem, info) -> str:
+        if not item.res_name:
+            return ""
+
+        lines = [f"Resource: {item.res_name}"]
+        if info:
+            if info.type_name:
+                lines.append(f"Type: {info.type_name}")
+            if info.generic_name and info.generic_name != info.display_name:
+                lines.append(f"Generic name: {info.generic_name}")
+            if info.display_name:
+                lines.append(f"Identified name: {info.display_name}")
+            if info.enchantment is not None:
+                lines.append(f"Enchantment: {info.enchantment}")
+            if info.base_value is not None:
+                lines.append(f"Base value: {info.base_value}")
+            if info.weight is not None:
+                lines.append(f"Weight: {info.weight}")
+            if info.max_stackable is not None:
+                lines.append(f"Max stack: {info.max_stackable}")
+            if info.lore is not None:
+                lines.append(f"Lore: {info.lore}")
+        else:
+            lines.append("Status: not found in game resources")
+
+        description = get_item_description(item.res_name)
+        if description:
+            lines.extend(["", description])
+        return "\n".join(lines)
 
     def _swap_items(self, source_row: int, target_row: int):
         """Swap items between two inventory slots."""

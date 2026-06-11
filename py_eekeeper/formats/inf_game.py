@@ -420,6 +420,14 @@ class InfGame:
                 return True
         return False
 
+    def mark_saved(self):
+        """Reset dirty flags after loading or saving the current in-memory game."""
+        self._has_changed = False
+        for cre in self._party:
+            cre.mark_saved()
+        for cre in self._out_party:
+            cre.mark_saved()
+
     @property
     def error(self) -> int:
         return self._error

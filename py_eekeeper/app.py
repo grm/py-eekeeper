@@ -18,6 +18,7 @@ from .resources.spell_bitmaps import SpellBitmaps
 from .resources.kits import encode_kit_ids_value
 from .resources.proficiencies import load_weapprof_items
 from .resources.game_lists import load_effect_text_items, load_haterace_items
+from .resources.item_info import ItemInfo, parse_item_info
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class EEKeeperApp:
         self.vl_enemy_ally = ValueList("Enemy/Ally")
         self.vl_state = ValueList("State")
         self.vl_spells = ValueList("Spells")
+        self.vl_items = ValueList("Items")
         self.vl_animations = ValueList("Animations")
         self.vl_profs = ValueList("Proficiencies")
         self.vl_affects = ValueList("Affects")
@@ -97,6 +99,7 @@ class EEKeeperApp:
         self._load_racial_enemies()
         self._load_kits()
         self._load_spells()
+        self._load_items()
         self._load_profs()
         self._load_affects()
 
@@ -170,7 +173,34 @@ class EEKeeperApp:
         spell_names = self.resource_manager.get_resource_list(RESTYPE_SPL)
         for name in spell_names:
             friendly = self.get_spell_name(name)
-            self.vl_spells.add(ValueItem(index=0, name=f"{name} - {friendly}"))
+            self.vl_spells.add(ValueItem(index=0, name=self._format_resource_list_name(name, friendly)))
+
+    def _load_items(self):
+        self.vl_items.clear()
+        item_names = self.resource_manager.get_resource_list(RESTYPE_ITM)
+        for name in item_names:
+            friendly = self.get_item_name(name)
+            self.vl_items.add(ValueItem(index=0, name=self._format_resource_list_name(name, friendly)))
+
+    @staticmethod
+    def _format_resource_list_name(res_name: str, friendly: str) -> str:
+        return f"{res_name} - {friendly}" if friendly != res_name else res_name
+
+    @staticmethod
+    def _parse_resource_list_name(list_name: str) -> tuple[str, str]:
+        res_name, sep, friendly = list_name.partition(" - ")
+        return res_name, friendly if sep else res_name
+
+    def iter_items(self):
+        """Yield (resource_name, display_name) pairs from the loaded item list."""
+        for item in self.vl_items:
+            yield self._parse_resource_list_name(item.name)
+
+    def has_item(self, res_name: str) -> bool:
+        """Return True when the item resource exists in the game data."""
+        if not res_name:
+            return False
+        return self.resource_manager.get_resource(RESTYPE_ITM, res_name) is not None
 
     def _load_profs(self):
         self.vl_profs.clear()
@@ -232,13 +262,16 @@ class EEKeeperApp:
         return res_name
 
     def get_item_name(self, res_name: str) -> str:
-        data = self.resource_manager.get_resource(RESTYPE_ITM, res_name)
-        if data and len(data) >= 12:
-            strref = struct.unpack_from("<I", data, 8)[0]
-            name = self.tlk.get_string(strref)
-            if name:
-                return name
+        info = self.get_item_info(res_name)
+        if info:
+            return info.display_name
         return res_name
+
+    def get_item_info(self, res_name: str) -> ItemInfo | None:
+        data = self.resource_manager.get_resource(RESTYPE_ITM, res_name)
+        if not data:
+            return None
+        return parse_item_info(res_name, data, self.tlk.get_string)
 
     def open_save(self, save_dir: str | Path) -> bool:
         save_dir = Path(save_dir)

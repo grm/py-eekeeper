@@ -368,18 +368,24 @@ The Python version covers the most useful character editing fields, but not the 
 
 - displays slots, names, quantities, identification;
 - inventory is essentially read-only in the observed historical UI;
-- the item browser exists as a stub widget / planned UI, but logic is weak or absent.
+- validates equipped items against game ITM resources via `EEKeeper::GetItem()` and warns when items are missing from the database;
+- the item browser exists as a stub widget / planned UI, but logic is weak or absent;
+- there is no central `_vlItems` list; items are resolved on demand from KEY/BIF.
 
 **py-eekeeper**:
 
 - displays 38 rows;
-- supports `Set Item` through a full graphical `ItemBrowserDialog` with search filter, item icons from BAM, and name display;
+- supports `Set Item` through a full graphical `ItemBrowserDialog` with search filter, category/type filters, item icons from BAM, and ITM metadata display;
 - supports `Remove`;
 - supports `Identify All`;
-- item icons are shown in the browser dialog via `SpellBitmaps.get_item_icon()`;
-- displays quantities but does not provide rich charge/quantity editing.
+- item icons are shown in the browser dialog and inventory table via `SpellBitmaps.get_item_icon()`;
+- loads a central `vl_items` list in `EEKeeperApp` from ITM resources (same pattern as `vl_spells`);
+- `ItemBrowserDialog` and inventory validation use that shared list through `iter_items()` / `has_item()`;
+- inventory rows now expose larger item icons and ITM header metadata directly in the page: type, resource name, stack size, base value, weight, lore, enchantment, and detailed tooltips;
+- warns on unknown inventory items, matching the legacy Qt behavior;
+- displays quantities as `qty1/qty2/qty3` but does not provide rich charge/quantity editing.
 
-Python surpasses old Qt for effective inventory editing and now includes a graphical item browser.
+Python surpasses old Qt for effective inventory editing and now includes a graphical item browser with centralized item list management. ITM display metadata is covered by `tests/test_app_items.py`.
 
 ### 10.3 Known Spells
 

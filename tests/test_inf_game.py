@@ -143,6 +143,31 @@ def test_modify_and_write():
     Path(out_path).unlink()
 
 
+def test_mark_saved_clears_game_and_creature_dirty_flags():
+    data = _make_minimal_gam()
+
+    with tempfile.NamedTemporaryFile(suffix=".GAM", delete=False) as f:
+        f.write(data)
+        f.flush()
+        path = f.name
+
+    game = InfGame()
+    assert game.read(path)
+
+    cre = game.get_party_cre(0)
+    assert cre is not None
+    game.party_gold = 99999
+    cre.strength = 20
+
+    assert game.has_changed()
+
+    game.mark_saved()
+
+    assert not game.has_changed()
+
+    Path(path).unlink()
+
+
 def test_game_header_size_matches_eekeeper_qt():
     assert GAME_HEADER_SIZE == 0xB4
 

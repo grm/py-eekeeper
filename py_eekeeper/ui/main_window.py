@@ -282,6 +282,7 @@ class MainWindow(QMainWindow):
                 self._action_compare.setEnabled(total_chars >= 2)
                 self._statusbar.showMessage(f"Loaded: {save_dir}")
                 self._show_mod_count()
+                self._app.game.mark_saved()
             else:
                 QMessageBox.warning(self, "Error", "Failed to open save game.")
 
